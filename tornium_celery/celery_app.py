@@ -15,9 +15,6 @@
 
 from gevent import monkey
 
-#
-# monkey.patch_all()
-
 import importlib.util
 import sys
 
