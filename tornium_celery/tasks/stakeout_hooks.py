@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import datetime
 import math
 import random
 import re
@@ -166,6 +167,8 @@ def user_hook(user_data):
                             f"{rel_time(user_data['last_action']['timestamp'])}"
                         ),
                         "color": SKYNET_INFO,
+                        "timestamp": datetime.datetime.utcnow().isoformat(),
+                        "footer": {"text": torn_timestamp()},
                     }
                 ]
             }
@@ -191,6 +194,8 @@ def user_hook(user_data):
                             f"{rel_time(user_data['last_action']['timestamp'])}"
                         ),
                         "color": SKYNET_INFO,
+                        "timestamp": datetime.datetime.utcnow().isoformat(),
+                        "footer": {"text": torn_timestamp()},
                     }
                 ]
             }
@@ -219,6 +224,8 @@ def user_hook(user_data):
                             f"{user_data['status']['description'].lower()}."
                         ),
                         "color": SKYNET_INFO,
+                        "timestamp": datetime.datetime.utcnow().isoformat(),
+                        "footer": {"text": torn_timestamp()},
                     }
                 ]
             }
@@ -247,6 +254,8 @@ def user_hook(user_data):
                         "title": f"{user_data['name']} has Landed",
                         "description": f"{user_data['name']} [{user_data['player_id']}] {description_suffix}.",
                         "color": SKYNET_INFO,
+                        "timestamp": datetime.datetime.utcnow().isoformat(),
+                        "footer": {"text": torn_timestamp()},
                     }
                 ],
                 "components": [
@@ -306,6 +315,8 @@ def user_hook(user_data):
                             f"{'hospital' if re.match(r'In Hospital.*', description) else 'jail'}."
                         ),
                         "color": SKYNET_INFO,
+                        "timestamp": datetime.datetime.utcnow().isoformat(),
+                        "footer": {"text": torn_timestamp()},
                     }
                 ]
             }
@@ -352,6 +363,8 @@ def user_hook(user_data):
                             f"they {payload_description}."
                         ),
                         "color": SKYNET_INFO,
+                        "timestamp": datetime.datetime.utcnow().isoformat(),
+                        "footer": {"text": torn_timestamp()},
                     }
                 ]
             }
