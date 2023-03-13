@@ -19,14 +19,13 @@ import re
 import time
 
 import celery
-from boltons.timeutils import relative_time
 from mongoengine import QuerySet
 from mongoengine.queryset.visitor import Q
 
 from tornium_celery.tasks.api import discordpost, tornget
 from tornium_commons import rds
 from tornium_commons.errors import DiscordError, NetworkingError
-from tornium_commons.formatters import torn_timestamp
+from tornium_commons.formatters import rel_time, torn_timestamp
 from tornium_commons.models import NotificationModel, ServerModel, UserModel
 from tornium_commons.skyutils import SKYNET_INFO
 
@@ -164,7 +163,7 @@ def user_hook(user_data):
                         "title": f"{user_data['name']} Status Change",
                         "description": (
                             f"{user_data['name']} [{user_data['player_id']}] has now been inactive since "
-                            f"{relative_time(user_data['last_action']['timestamp'])}"
+                            f"{rel_time(user_data['last_action']['timestamp'])}"
                         ),
                         "color": SKYNET_INFO,
                     }
@@ -189,7 +188,7 @@ def user_hook(user_data):
                         "title": f"{user_data['name']} Status Change",
                         "description": (
                             f"{user_data['name']} [{user_data['player_id']}] has now been active since "
-                            f"{relative_time(user_data['last_action']['timestamp'])}"
+                            f"{rel_time(user_data['last_action']['timestamp'])}"
                         ),
                         "color": SKYNET_INFO,
                     }
