@@ -153,11 +153,8 @@ def user_hook(user_data):
         else:
             user_data["name"] = user.name
 
-    if "last_action" in user_data and redis_client.exists(redis_key + ":last_action:timestamp"):
-        if (
-            int(time.time()) - int(redis_client.get(redis_key + ":last_action:timestamp")) <= 300
-            and int(time.time()) - user_data["last_action"]["timestamp"] > 300
-        ):
+    if "last_action" in user_data:
+        if 250 > int(time.time()) - user_data["last_action"]["timestamp"] > 360:
             payload = {
                 "embeds": [
                     {
@@ -175,24 +172,22 @@ def user_hook(user_data):
 
             notification: NotificationModel
             for notification in notifications:
-                if 0 not in notification.value:
+                if 1 not in notification.value:
                     continue
                 elif not notification.options["enabled"]:
                     continue
 
                 send_notification(notification, payload)
         elif (
-            int(time.time()) - int(redis_client.get(redis_key + ":last_action:timestamp")) > 300
+            redis_client.exists(redis_key + ":last_action:timestamp")
+            and int(time.time()) - int(redis_client.get(redis_key + ":last_action:timestamp")) > 300
             and int(time.time()) - user_data["last_action"]["timestamp"] <= 300
         ):
             payload = {
                 "embeds": [
                     {
                         "title": f"{user_data['name']} Status Change",
-                        "description": (
-                            f"{user_data['name']} [{user_data['player_id']}] has now been active since "
-                            f"{rel_time(user_data['last_action']['timestamp'])}"
-                        ),
+                        "description": f"{user_data['name']} [{user_data['player_id']}] is now active.",
                         "color": SKYNET_INFO,
                         "timestamp": datetime.datetime.utcnow().isoformat(),
                         "footer": {"text": torn_timestamp()},
@@ -202,7 +197,7 @@ def user_hook(user_data):
 
             notification: NotificationModel
             for notification in notifications:
-                if 1 not in notification.value:
+                if 0 not in notification.value:
                     continue
                 elif not notification.options["enabled"]:
                     continue
