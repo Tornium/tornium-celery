@@ -155,7 +155,7 @@ def user_hook(user_data):
 
     if "last_action" in user_data and redis_client.exists(redis_key + ":last_action:timestamp"):
         if (
-            int(time.time()) - redis_client.get(redis_key + ":last_action:timestamp") <= 300
+            int(time.time()) - int(redis_client.get(redis_key + ":last_action:timestamp")) <= 300
             and int(time.time()) - user_data["last_action"]["timestamp"] > 300
         ):
             payload = {
@@ -180,7 +180,7 @@ def user_hook(user_data):
 
                 send_notification(notification, payload)
         elif (
-            int(time.time()) - redis_client.get(redis_key + ":last_action:timestmap") > 300
+            int(time.time()) - int(redis_client.get(redis_key + ":last_action:timestamp")) > 300
             and int(time.time()) - user_data["last_action"]["timestamp"] <= 300
         ):
             payload = {
