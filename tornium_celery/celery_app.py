@@ -162,7 +162,12 @@ if celery_app is None:
                 "task": "tasks.stocks.fetch_stock_ticks",
                 "enabled": True,
                 "schedule": {"type": "cron", "minute": "*", "hour": "*"},
-            },
+            }, # Stakeout hooks/tasks
+            "run-user-stakeouts": {
+                "task": "tasks.stakeout_hooks.run_user_stakeouts",
+                "enabled": True,
+                "schedule": {"type": "cron", "minute": "*", "hour": "*"},
+            }
         }
 
         with open("celery.json", "w") as file:
@@ -180,6 +185,7 @@ if celery_app is None:
             "tasks.faction",
             "tasks.guild",
             "tasks.misc",
+            "tasks.stakeout_hooks",
             "tasks.stakeouts",
             "tasks.stocks",
             "tasks.user",
@@ -275,7 +281,15 @@ if celery_app is None:
                 hour=data["fetch-stock-ticks"]["schedule"]["hour"],
             ),
         }
+    if "run-user-stakeouts" in data and data["run-user-stakeouts"]["enabled"]:
+        schedule["run-user-stakeouts"] = {
+            "task": data["run-user-stakeouts"]["task"],
+            "schedule": crontab(
+                minute=data["run-user-stakeouts"]["schedule"]["minute"],
+                hour=data["run-user-stakeouts"]["schedule"]["hour"],
+            )
+        }
 
     celery_app.conf.beat_schedule = schedule
-    celery_app.conf.result_expires = 180  # Results are evicted from Redis cache after three minutes
+    celery_app.conf.result_expires = 300  # Results are evicted from Redis cache after five minutes
     celery_app.set_default()
