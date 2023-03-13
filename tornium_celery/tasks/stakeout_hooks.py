@@ -153,7 +153,7 @@ def user_hook(user_data):
         else:
             user_data["name"] = user.name
 
-    if "last_action" in user_data:
+    if "last_action" in user_data and redis_client.exists(redis_key + ":last_action:timestamp"):
         if (
             int(time.time()) - redis_client.get(redis_key + ":last_action:timestamp") <= 300
             and int(time.time()) - user_data["last_action"]["timestamp"] > 300
@@ -205,7 +205,7 @@ def user_hook(user_data):
 
                 send_notification(notification, payload)
 
-    if "status" in user_data:
+    if "status" in user_data and redis_client.exists(redis_key + ":status:description"):
         description = redis_client.get(redis_key + ":status:description")
 
         if re.match(r"(Traveling|Returning)", user_data["status"]["description"]) and not re.match(
