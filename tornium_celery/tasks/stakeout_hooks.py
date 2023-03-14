@@ -154,7 +154,7 @@ def user_hook(user_data):
             user_data["name"] = user.name
 
     if "last_action" in user_data:
-        if 250 > int(time.time()) - user_data["last_action"]["timestamp"] > 360:
+        if 300 < int(time.time()) - user_data["last_action"]["timestamp"] < 360:
             payload = {
                 "embeds": [
                     {
