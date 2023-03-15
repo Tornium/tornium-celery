@@ -18,6 +18,7 @@ import math
 import random
 import re
 import time
+import typing
 
 import celery
 from mongoengine import QuerySet
@@ -131,13 +132,16 @@ def run_user_stakeouts():
 
 
 @celery.shared_task(routing_key="quick.stakeouts.user_hook", queue="quick")
-def user_hook(user_data):
+def user_hook(user_data, faction: typing.Optional[int] = None):
     if "player_id" not in user_data:
         return
 
-    notifications: QuerySet = NotificationModel.objects(
-        Q(invoker=user_data["player_id"]) & Q(ntype=1) & Q(options__enabled=True)
-    )
+    if faction is None:
+        notifications: QuerySet = NotificationModel.objects(
+            Q(target=user_data["player_id"]) & Q(ntype=1) & Q(options__enabled=True)
+        )
+    else:
+        notifications: QuerySet = NotificationModel.objects(Q(target=faction) & Q(ntype=2) & Q(options__enabled=True))
 
     if notifications.count() == 0:
         return
@@ -172,7 +176,9 @@ def user_hook(user_data):
 
             notification: NotificationModel
             for notification in notifications:
-                if 1 not in notification.value:
+                if faction is None and 1 not in notification.value:
+                    continue
+                elif faction is not None and 3 not in notification.value:
                     continue
                 elif not notification.options["enabled"]:
                     continue
@@ -197,7 +203,9 @@ def user_hook(user_data):
 
             notification: NotificationModel
             for notification in notifications:
-                if 0 not in notification.value:
+                if faction is None and 0 not in notification.value:
+                    continue
+                elif faction is not None and 2 not in notification.value:
                     continue
                 elif not notification.options["enabled"]:
                     continue
@@ -210,6 +218,7 @@ def user_hook(user_data):
         if re.match(r"(Traveling|Returning)", user_data["status"]["description"]) and not re.match(
             r"(Traveling|Returning)", description
         ):
+            destination_durations = _TRAVEL_DESTINATIONS[get_destination(user_data["status"]["description"])]
             payload = {
                 "embeds": [
                     {
@@ -218,36 +227,6 @@ def user_hook(user_data):
                             f"{user_data['name']} [{user_data['player_id']}] is now "
                             f"{user_data['status']['description'].lower()}."
                         ),
-                        "color": SKYNET_INFO,
-                        "timestamp": datetime.datetime.utcnow().isoformat(),
-                        "footer": {"text": torn_timestamp()},
-                    }
-                ]
-            }
-
-            notification: NotificationModel
-            for notification in notifications:
-                if 2 not in notification.value:
-                    continue
-                elif not notification.options["enabled"]:
-                    continue
-
-                send_notification(notification, payload)
-        elif not re.match(r"(Traveling|Returning)", user_data["status"]["description"]) and re.match(
-            r"(Traveling|Returning)", description
-        ):
-            if user_data["status"]["state"] != "Abroad":
-                description_suffix = f"has returned to Torn"
-            else:
-                description_suffix = f"has landed {user_data['status']['description'].lower()}"
-
-            destination_durations = _TRAVEL_DESTINATIONS[get_destination(user_data["status"]["description"])]
-
-            payload = {
-                "embeds": [
-                    {
-                        "title": f"{user_data['name']} has Landed",
-                        "description": f"{user_data['name']} [{user_data['player_id']}] {description_suffix}.",
                         "color": SKYNET_INFO,
                         "timestamp": datetime.datetime.utcnow().isoformat(),
                         "footer": {"text": torn_timestamp()},
@@ -293,7 +272,39 @@ def user_hook(user_data):
 
             notification: NotificationModel
             for notification in notifications:
-                if 2 not in notification.value:
+                if faction is None and 2 not in notification.value:
+                    continue
+                elif faction is not None and 4 not in notification.value:
+                    continue
+                elif not notification.options["enabled"]:
+                    continue
+
+                send_notification(notification, payload)
+        elif not re.match(r"(Traveling|Returning)", user_data["status"]["description"]) and re.match(
+            r"(Traveling|Returning)", description
+        ):
+            if user_data["status"]["state"] != "Abroad":
+                description_suffix = f"has returned to Torn"
+            else:
+                description_suffix = f"has landed {user_data['status']['description'].lower()}"
+
+            payload = {
+                "embeds": [
+                    {
+                        "title": f"{user_data['name']} has Landed",
+                        "description": f"{user_data['name']} [{user_data['player_id']}] {description_suffix}.",
+                        "color": SKYNET_INFO,
+                        "timestamp": datetime.datetime.utcnow().isoformat(),
+                        "footer": {"text": torn_timestamp()},
+                    }
+                ]
+            }
+
+            notification: NotificationModel
+            for notification in notifications:
+                if faction is None and 2 not in notification.value:
+                    continue
+                elif faction is not None and 4 not in notification.value:
                     continue
                 elif not notification.options["enabled"]:
                     continue
@@ -318,7 +329,9 @@ def user_hook(user_data):
 
             notification: NotificationModel
             for notification in notifications:
-                if 3 not in notification.value:
+                if faction is None and 3 not in notification.value:
+                    continue
+                elif faction is not None and 1 not in notification.value:
                     continue
                 elif not notification.options["enabled"]:
                     continue
@@ -366,7 +379,9 @@ def user_hook(user_data):
 
             notification: NotificationModel
             for notification in notifications:
-                if 4 not in notification.value:
+                if faction is None and 4 not in notification.value:
+                    continue
+                elif faction is not None and 1 not in notification.value:
                     continue
                 elif not notification.options["enabled"]:
                     continue
@@ -381,3 +396,132 @@ def user_hook(user_data):
         redis_client.set(redis_key + ":status:description", user_data["status"]["description"], ex=300)
         redis_client.set(redis_key + ":status:state", user_data["status"]["state"], ex=300)
         redis_client.set(redis_key + ":status:until", user_data["status"]["until"], ex=300)
+
+
+@celery.shared_task(routing_key="quick.stakeouts.run_faction", queue="quick")
+def run_faction_stakeouts():
+    target: int
+    for target in (
+        NotificationModel.objects(Q(ntype=2) & Q(options__enabled=True)).only("target").distinct(field="target")
+    ):
+        notification: NotificationModel = NotificationModel.objects(
+            Q(ntype=2) & Q(target=target) & Q(options__enabled=True)
+        ).first()
+
+        if notification is None:
+            continue
+
+        invoker: UserModel = UserModel.objects(tid=notification.invoker).first()
+
+        if invoker is None or invoker.key in ("", None):
+            if notification.recipient_type == 1:
+                guild: ServerModel = ServerModel.objects(sid=notification.recipient_guild).first()
+
+                if guild is None or len(guild.admins) == 0:
+                    continue
+
+                key_user: UserModel = UserModel.objects(tid=random.choice(guild.admins)).first()
+
+                if key_user is None:
+                    continue
+
+                key = key_user.key
+            else:
+                continue
+        else:
+            key = invoker.key
+
+        if key in ("", None):
+            continue
+
+        tornget.signature(
+            kwargs={
+                "endpoint": f"user/{notification.target}?selections=",
+                "key": key,
+            },
+            queue="api",
+        ).apply_async(expires=300, link=user_hook.s())
+
+
+@celery.shared_task(routing_key="quick.stakeouts.faction_hook", queue="quick")
+def faction_hook(faction_data):
+    if "ID" not in faction_data:
+        return
+
+    notifications: QuerySet = NotificationModel.objects(
+        Q(invoker=faction_data["ID"]) & Q(ntype=1) & Q(options__enabled=True)
+    )
+
+    if notifications.count() == 0:
+        return
+
+    redis_key = f"tornium:stakeout-data:faction:{faction_data['ID']}"
+    redis_client = rds()
+
+    if "members" in faction_data:
+        for member_id in redis_client.smembers(redis_key + ":members"):
+            if str(member_id) not in faction_data["members"].keys():
+                member: typing.Optional[UserModel] = UserModel.objects(tid=int(member_id)).first()
+
+                payload = {
+                    "embeds": [
+                        {
+                            "title": "",
+                            "description": "",
+                            "color": SKYNET_INFO,
+                            "timestamp": datetime.datetime.utcnow().isoformat(),
+                            "footer": {"text": torn_timestamp()},
+                        }
+                    ]
+                }
+
+                if member is None:
+                    payload["embeds"][0]["title"] = "Member Left Faction"
+                    payload["embeds"][0][
+                        "description"
+                    ] = f"Unknown [{member_id}] has left {faction_data['name']} [{faction_data['ID']}]."
+                else:
+                    payload["embeds"][0]["title"] = f"{member.name} Left Faction"
+                    payload["embeds"][0][
+                        "description"
+                    ] = f"{member.name} [{member_id}] has left {faction_data['name']} [{faction_data['ID']}]."
+
+                notification: NotificationModel
+                for notification in notifications:
+                    if 0 not in notification.value:
+                        continue
+                    elif not notification.options["enabled"]:
+                        continue
+
+                    send_notification(notification, payload)
+
+        for member_id, member_data in faction_data["members"].items():
+            member_data["player_id"] = int(member_id)
+            user_hook.delay(member_data, faction_data["ID"]).forget()
+
+            skip_member_notifs = redis_client.scard(redis_key + ":members") == 0
+
+            if not redis_client.sismember(redis_key + ":members", member_id):
+                redis_client.sadd(redis_key + ":members", member_id)
+
+                if not skip_member_notifs:
+                    payload = {
+                        "embeds": [
+                            {
+                                "title": "Member Joined Faction",
+                                "description": f"{member_data['name']} [{member_data['player_id']} has joined {faction_data['name']} [{faction_data['ID']}].",
+                                "color": SKYNET_INFO,
+                                "timestamp": datetime.datetime.utcnow().isoformat(),
+                                "footer": {"text": torn_timestamp()},
+                            }
+                        ]
+                    }
+
+                    notification: NotificationModel
+                    for notification in notifications:
+                        if 0 not in notification.value:
+                            continue
+                        elif not notification.options["enabled"]:
+                            continue
+
+                        send_notification(notification, payload)

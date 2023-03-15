@@ -162,12 +162,17 @@ if celery_app is None:
                 "task": "tasks.stocks.fetch_stock_ticks",
                 "enabled": True,
                 "schedule": {"type": "cron", "minute": "*", "hour": "*"},
-            }, # Stakeout hooks/tasks
+            },  # Stakeout hooks/tasks
             "run-user-stakeouts": {
                 "task": "tasks.stakeout_hooks.run_user_stakeouts",
                 "enabled": True,
                 "schedule": {"type": "cron", "minute": "*", "hour": "*"},
-            }
+            },
+            "run-faction-stakeouts": {
+                "task": "tasks.stakeout_hooks.run_faction_stakeouts",
+                "enabled": True,
+                "schedule": {"type": "cron", "minute": "*", "hour": "*"},
+            },
         }
 
         with open("celery.json", "w") as file:
@@ -287,7 +292,15 @@ if celery_app is None:
             "schedule": crontab(
                 minute=data["run-user-stakeouts"]["schedule"]["minute"],
                 hour=data["run-user-stakeouts"]["schedule"]["hour"],
-            )
+            ),
+        }
+    if "run-faction-stakeouts" in data and data["run-faction-stakeouts"]["enabled"]:
+        schedule["run-faction-stakeouts"] = {
+            "task": data["run-faction-stakeouts"]["task"],
+            "schedule": crontab(
+                minute=data["run-faction-stakeouts"]["schedule"]["minute"],
+                hour=data["run-faction-stakeouts"]["schedule"]["hour"],
+            ),
         }
 
     celery_app.conf.beat_schedule = schedule
