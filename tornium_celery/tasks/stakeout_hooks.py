@@ -27,7 +27,7 @@ from mongoengine.queryset.visitor import Q
 from tornium_celery.tasks.api import discordpost, tornget
 from tornium_commons import rds
 from tornium_commons.errors import DiscordError, NetworkingError
-from tornium_commons.formatters import rel_time, torn_timestamp
+from tornium_commons.formatters import rel_time, str_matches, torn_timestamp
 from tornium_commons.models import NotificationModel, ServerModel, UserModel
 from tornium_commons.skyutils import SKYNET_INFO
 
@@ -42,7 +42,7 @@ _TRAVEL_DESTINATIONS = {
     "Switzerland": [10500, 7380, 5280, 3180],
     "Japan": [13500, 9480, 6780, 4080],
     "China": [14520, 10140, 7260, 4320],
-    "United Arab Emirates": [16260, 11400, 8100, 4860],
+    "UAE": [16260, 11400, 8100, 4860],
     "South Africa": [17820, 12480, 8940, 5340],
 }
 
@@ -225,7 +225,7 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
                         "title": f"{user_data['name']} is Flying",
                         "description": (
                             f"{user_data['name']} [{user_data['player_id']}] is now "
-                            f"{user_data['status']['description'].lower()}."
+                            f"{user_data['status']['description'][0].lower() + user_data['status']['description'][1:]}."
                         ),
                         "color": SKYNET_INFO,
                         "timestamp": datetime.datetime.utcnow().isoformat(),
@@ -240,12 +240,14 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
                                 "type": 2,
                                 "style": 2,
                                 "label": f"Standard: {first_landing(destination_durations[0])}",
+                                "custom_id": "standard-duration",
                                 "disabled": True,
                             },
                             {
                                 "type": 2,
                                 "style": 2,
                                 "label": f"Airstrip: {first_landing(destination_durations[1])}",
+                                "custom_id": "airstrip-duration",
                                 "disabled": True,
                             },
                         ],
@@ -257,12 +259,14 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
                                 "type": 2,
                                 "style": 2,
                                 "label": f"WLT: {first_landing(destination_durations[2])}",
+                                "custom_id": "wlt-duration",
                                 "disabled": True,
                             },
                             {
                                 "type": 2,
                                 "style": 2,
                                 "label": f"BCT: {first_landing(destination_durations[3])}",
+                                "custom_id": "bct-duration",
                                 "disabled": True,
                             },
                         ],
@@ -286,7 +290,7 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
             if user_data["status"]["state"] != "Abroad":
                 description_suffix = f"has returned to Torn"
             else:
-                description_suffix = f"has landed {user_data['status']['description'].lower()}"
+                description_suffix = f"has landed in {user_data['status']['description'][3:]}"
 
             payload = {
                 "embeds": [
@@ -311,7 +315,7 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
 
                 send_notification(notification, payload)
 
-        if user_data["status"]["description"] == "Okay" and re.match(r"In (Hospital|Jail).*", description):
+        if user_data["status"]["description"] == "Okay" and any(str_matches(description, ["Hospital", "Jail"])):
             payload = {
                 "embeds": [
                     {
@@ -338,19 +342,31 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
 
                 send_notification(notification, payload)
 
-        if re.match(r"In Hospital.*", user_data["status"]["description"]) and not re.match(
-            r"In Hospital.*", description
-        ):
-            if re.match(
-                r"(Hospitalized|Dropped|Shot|Mauled|Taken|Burned|Attacked|Mugged|Kicked|Suffering)",
-                user_data["status"]["description"],
+        if "In Hospital" in user_data["status"]["description"] and not "In Hospital" in description:
+            if any(
+                str_matches(
+                    user_data["status"]["details"],
+                    [
+                        "Hospitalized",
+                        "Dropped",
+                        "Shot",
+                        "Mauled",
+                        "Taken",
+                        "Burned",
+                        "Attacked",
+                        "Mugged",
+                        "Kicked",
+                        "Suffering",
+                    ],
+                    starts=True,
+                )
             ):
-                payload_description = f"have been {user_data['status']['description'].lower()}"
-            elif re.match(r"Was shot.*", user_data["status"]["description"]):
+                payload_description = f"have been {user_data['status']['details'].lower()}"
+            elif user_data["status"]["details"].startswith("Was shot"):
                 # Valid hosp reasons
                 # Was shot while resisting arrest
-                payload_description = user_data["status"]["description"].lower().replace("was shot", "have been shot")
-            elif re.match(r"Got.*", user_data["status"]["description"]):
+                payload_description = user_data["status"]["details"].lower().replace("was shot", "have been shot")
+            elif user_data["status"]["details"].startswith("Got"):
                 # Valid hosp reasons
                 # Got a nasty surprise in the post
                 payload_description = user_data["status"]["description"].lower().replace("got", "have gotten")
@@ -360,7 +376,7 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
                 # Crashed his [Car]
                 # Exploded
                 # Lost to [User]
-                payload_description = f"have {user_data['status']['description'].lower()}"
+                payload_description = f"have {user_data['status']['details'].lower()}"
 
             payload = {
                 "embeds": [
