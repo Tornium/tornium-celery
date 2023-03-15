@@ -440,7 +440,7 @@ def run_faction_stakeouts():
                 "key": key,
             },
             queue="api",
-        ).apply_async(expires=300, link=user_hook.s())
+        ).apply_async(expires=300, link=faction_hook.s())
 
 
 @celery.shared_task(routing_key="quick.stakeouts.faction_hook", queue="quick")
