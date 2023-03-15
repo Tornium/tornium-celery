@@ -449,7 +449,7 @@ def faction_hook(faction_data):
         return
 
     notifications: QuerySet = NotificationModel.objects(
-        Q(invoker=faction_data["ID"]) & Q(ntype=1) & Q(options__enabled=True)
+        Q(target=faction_data["ID"]) & Q(ntype=2) & Q(options__enabled=True)
     )
 
     if notifications.count() == 0:
