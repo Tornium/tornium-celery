@@ -158,7 +158,7 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
             user_data["name"] = user.name
 
     if "last_action" in user_data:
-        if 300 < int(time.time()) - user_data["last_action"]["timestamp"] < 360:
+        if 305 < int(time.time()) - user_data["last_action"]["timestamp"] < 355:
             payload = {
                 "embeds": [
                     {
