@@ -461,6 +461,7 @@ def faction_hook(faction_data):
     if "members" in faction_data:
         for member_id in redis_client.smembers(redis_key + ":members"):
             if str(member_id) not in faction_data["members"].keys():
+                redis_client.srem(redis_key + ":members", member_id)
                 member: typing.Optional[UserModel] = UserModel.objects(tid=int(member_id)).first()
 
                 payload = {
