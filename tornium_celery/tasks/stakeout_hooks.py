@@ -436,7 +436,7 @@ def run_faction_stakeouts():
 
         tornget.signature(
             kwargs={
-                "endpoint": f"user/{notification.target}?selections=",
+                "endpoint": f"faction/{notification.target}?selections=",
                 "key": key,
             },
             queue="api",
