@@ -38,7 +38,6 @@ def tornget(
     fromts=0,
     stat="",
     session=None,
-    autosleep=True,
 ):
     url = (
         f'https://api.torn.com/{endpoint}&key={key}&comment=Tornium{"" if fromts == 0 else f"&from={fromts}"}'
@@ -63,14 +62,11 @@ def tornget(
         if redis_client.get(redis_key) is not None and int(redis_client.get(redis_key)) > 0:
             redis_client.decrby(redis_key, 1)
         else:
-            if autosleep:
-                time.sleep(60 - datetime.datetime.utcnow().second)
+            if redis_client.get(redis_key) is None:
+                redis_client.set(redis_key, 50)
+                redis_client.expire(redis_key, 60 - datetime.datetime.utcnow().second)
             else:
-                if redis_client.get(redis_key) is None:
-                    redis_client.set(redis_key, 50)
-                    redis_client.expire(redis_key, 60 - datetime.datetime.utcnow().second)
-                else:
-                    raise RatelimitError
+                raise RatelimitError
     except TypeError:
         pass
 
@@ -649,7 +645,7 @@ def discorddelete(self, endpoint, session=None, bucket=None, retry=False, *args,
 
 
 @celery.shared_task(time_limit=15, routing_key="api.torn_stats_get", queue="api")
-def torn_stats_get(endpoint, key, session=None, autosleep=False):
+def torn_stats_get(endpoint, key, session=None):
     url = f"https://www.tornstats.com/api/v2/{key}/{endpoint}"
     redis_key = f"tornium:ts-ratelimit:{key}"
     redis_client = rds()
@@ -663,10 +659,7 @@ def torn_stats_get(endpoint, key, session=None, autosleep=False):
     if redis_client.get(redis_key) is not None and int(redis_client.get(redis_key)) > 0:
         redis_client.decrby(redis_key, 1)
     else:
-        if autosleep:
-            time.sleep(60 - datetime.datetime.utcnow().second)
-        else:
-            raise RatelimitError
+        raise RatelimitError
 
     try:
         if session is None:
