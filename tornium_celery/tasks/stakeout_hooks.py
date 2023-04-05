@@ -413,7 +413,7 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
 
 
 @celery.shared_task(
-    name="tasks.stakeout_hook.run_faction_stakeouts", routing_key="quick.stakeouts.run_faction", queue="quick"
+    name="tasks.stakeout_hooks.run_faction_stakeouts", routing_key="quick.stakeouts.run_faction", queue="quick"
 )
 def run_faction_stakeouts():
     target: int
