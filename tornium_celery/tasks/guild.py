@@ -162,7 +162,7 @@ def verify_users(
 
     redis_client = rds()
 
-    if redis_client.exists(f"tornium:verify:{guild.sid}:member_count") and highest_id != 0:
+    if redis_client.exists(f"tornium:verify:{guild.sid}:member_count") and highest_id == 0:
         raise RuntimeError(f"Run in {redis_client.ttl(f'tornium:verify:{guild.sid}:member_count')} seconds")
 
     redis_client.set(f"tornium:verify:{guild.sid}:member_count", 0, ex=600, nx=True)
