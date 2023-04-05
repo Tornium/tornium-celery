@@ -143,7 +143,7 @@ def verify_users(
     # -1: disabled
     #  n: channel ID
 
-    guild: typing.Optional[ServerModel] = ServerModel.objects(guild_id).first()
+    guild: typing.Optional[ServerModel] = ServerModel.objects(sid=guild_id).first()
 
     if guild is None:
         raise LookupError
