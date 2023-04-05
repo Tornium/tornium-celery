@@ -152,7 +152,7 @@ def verify_users(
     elif guild.verify_template == "" and len(guild.verified_roles) == 0 and len(guild.faction_verify) == 0:
         return ValueError("Verification will result in no state change")
 
-    if admin_keys is not None:
+    if admin_keys is None:
         admin_keys = tuple([admin.key for admin in guild.admins if admin is not None and admin.key not in ("", None)])
 
     server_data = discordget(
