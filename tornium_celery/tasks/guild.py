@@ -286,7 +286,7 @@ def verify_users(
                             "name": guild_member["nick"]
                             if "nick" in guild_member
                             else guild_member["user"]["username"],
-                            "icon": guild_member["user"]["avatar"],
+                            "icon": guild_member["user"].get("avatar"),
                             "roles": guild_member["roles"],
                         },
                         "log_channel": log_channel,
@@ -301,7 +301,7 @@ def verify_users(
                             "name": guild_member["nick"]
                             if "nick" in guild_member
                             else guild_member["user"]["username"],
-                            "icon": guild_member["user"]["avatar"],
+                            "icon": guild_member["user"].get("avatar"),
                         },
                         "log_channel": log_channel,
                     }
@@ -313,7 +313,7 @@ def verify_users(
                     "member": {
                         "id": guild_member["user"]["id"],
                         "name": guild_member["nick"] if "nick" in guild_member else guild_member["user"]["username"],
-                        "icon": guild_member["user"]["avatar"],
+                        "icon": guild_member["user"].get("avatar"),
                         "roles": guild_member["roles"],
                     },
                     "log_channel": log_channel,
@@ -366,23 +366,29 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
         if log_channel == -1:
             return
 
+        payload = {
+            "embeds": [
+                {
+                    "title": "API Verification Failed",
+                    "description": f"<@{member['id']} is not officially verified by Torn.",
+                    "color": SKYNET_INFO,
+                    "author": {
+                        "name": member["name"],
+                        "url": f"https://discord.com/users/{member['id']}",
+                    },
+                    "timestamp": datetime.datetime.utcnow().isoformat(),
+                }
+            ]
+        }
+
+        if member["avatar"] is not None:
+            payload["embeds"][0]["author"][
+                "icon_url"
+            ] = f"https://cdn.discordapp.com/avatars/{member['id']}/{member['avatar']}.webp"
+
         discordpost.delay(
             endpoint=f"channels/{log_channel}/messages",
-            payload={
-                "embeds": [
-                    {
-                        "title": "API Verification Failed",
-                        "description": f"<@{member['id']} is not officially verified by Torn.",
-                        "color": SKYNET_INFO,
-                        "author": {
-                            "name": member["name"],
-                            "url": f"https://discord.com/users/{member['id']}",
-                            "icon_url": f"https://cdn.discordapp.com/avatars/{member['id']}/{member['avatar']}.webp",
-                        },
-                        "timestamp": datetime.datetime.utcnow().isoformat(),
-                    }
-                ]
-            },
+            payload=payload,
             bucket=f"channels/{log_channel}",
         ).forget()
         return
@@ -487,24 +493,30 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
     ).forget()
 
     if log_channel > 0:
+        payload = {
+            "embeds": [
+                {
+                    "title": "API Verification Attempted",
+                    "description": f"<@{member['id']} is officially verified by Torn. Their roles and nickname "
+                    f"have been updated.",
+                    "color": SKYNET_INFO,
+                    "author": {
+                        "name": member["name"],
+                        "url": f"https://discord.com/users/{member['id']}",
+                    },
+                    "timestamp": datetime.datetime.utcnow().isoformat(),
+                }
+            ]
+        }
+
+        if member["avatar"] is not None:
+            payload["embeds"][0]["author"][
+                "icon_url"
+            ] = f"https://cdn.discordapp.com/avatars/{member['id']}/{member['avatar']}.webp"
+
         discordpost.delay(
             endpoint=f"channels/{log_channel}/messages",
-            payload={
-                "embeds": [
-                    {
-                        "title": "API Verification Attempted",
-                        "description": f"<@{member['id']} is officially verified by Torn. Their roles and nickname "
-                        f"have been updated.",
-                        "color": SKYNET_INFO,
-                        "author": {
-                            "name": member["name"],
-                            "url": f"https://discord.com/users/{member['id']}",
-                            "icon_url": f"https://cdn.discordapp.com/avatars/{member['id']}/{member['avatar']}.webp",
-                        },
-                        "timestamp": datetime.datetime.utcnow().isoformat(),
-                    }
-                ]
-            },
+            payload=payload,
             bucket=f"channels/{log_channel}",
             retry=True,
         ).forget()
@@ -535,12 +547,17 @@ def verify_member_error(
                         "author": {
                             "name": member["name"],
                             "url": f"https://discord.com/users/{member['id']}",
-                            "icon_url": f"https://cdn.discordapp.com/avatars/{member['id']}/{member['avatar']}.webp",
                         },
                         "timestamp": datetime.datetime.utcnow().isoformat(),
                     }
                 ]
             }
+
+            if member["avatar"] is not None:
+                payload["embeds"][0]["author"][
+                    "icon_url"
+                ] = f"https://cdn.discordapp.com/avatars/{member['id']}/{member['avatar']}.webp"
+
         else:
             rds().incrby(f"tornium:verify:{guild_id}:errors", 1)
             payload = {
