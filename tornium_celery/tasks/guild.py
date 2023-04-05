@@ -29,12 +29,12 @@ from tornium_commons.formatters import torn_timestamp
 from tornium_commons.models import PositionModel, ServerModel, UserModel
 from tornium_commons.skyutils import SKYNET_ERROR, SKYNET_INFO
 
-from tornium_celery.tasks.api import discordget, discordpost, tornget
+from .api import discordget, discordpost, tornget
 
 logger = get_task_logger(__name__)
 
 
-@celery.shared_task(routing_key="default.refresh_guilds", queue="default")
+@celery.shared_task(name="tasks.guild.refresh_guilds", routing_key="default.refresh_guilds", queue="default")
 def refresh_guilds():
     requests_session = requests.Session()
 
@@ -134,7 +134,7 @@ def refresh_guilds():
         guild.delete()
 
 
-@celery.shared_task(routing_key="default.verify_users", queue="default")
+@celery.shared_task(name="tasks.guild.verify_users", routing_key="default.verify_users", queue="default")
 def verify_users(
     guild_id: int, admin_keys: typing.Optional[set] = None, force=False, highest_id: int = 0, log_channel: int = -2
 ):
@@ -338,7 +338,7 @@ def verify_users(
     ).forget()
 
 
-@celery.shared_task(routing_key="quick.verify_member_sub", queue="quick")
+@celery.shared_task(name="tasks.guild.verify_member_sub", routing_key="quick.verify_member_sub", queue="quick")
 def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id: int, new_data=True):
     if user_data["player_id"] == 0:
         return
@@ -509,7 +509,7 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
         ).forget()
 
 
-@celery.shared_task(routing_key="quick.verify_member_error", queue="quick")
+@celery.shared_task(name="tasks.guild.verify_member_error", routing_key="quick.verify_member_error", queue="quick")
 def verify_member_error(
     request,
     exc: typing.Union[Exception, TornError, NetworkingError],
