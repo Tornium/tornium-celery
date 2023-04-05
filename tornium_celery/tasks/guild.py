@@ -207,10 +207,11 @@ def verify_users(
             pass
 
     if (
-        redis_client.get(f"tornium:verify:{guild.sid}:member_count") > server_data["approximate_member_count"] * 0.99
-        or redis_client.get(f"tornium:verify:{guild.sid}:member_fetch_runs")
+        int(redis_client.get(f"tornium:verify:{guild.sid}:member_count"))
+        > server_data["approximate_member_count"] * 0.99
+        or int(redis_client.get(f"tornium:verify:{guild.sid}:member_fetch_runs"))
         >= (server_data["approximate_member_count"] // ((30 * len(admin_keys)) + 1))
-        or redis_client.get(f"tornium:verify:{guild.sid}:member_fetch_runs") >= 50
+        or int(redis_client.get(f"tornium:verify:{guild.sid}:member_fetch_runs")) >= 50
     ):
         return
 
