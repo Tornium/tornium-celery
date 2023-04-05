@@ -156,7 +156,7 @@ def verify_users(
         admin_keys = tuple([admin.key for admin in guild.admins if admin is not None and admin.key not in ("", None)])
 
     server_data = discordget(
-        f"guilds{guild.sid}?with_counts=true",
+        f"guilds/{guild.sid}?with_counts=true",
         bucket=f"guilds/{guild.sid}",
     )
 
