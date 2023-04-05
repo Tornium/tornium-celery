@@ -265,8 +265,8 @@ def verify_users(
         elif guild_member["user"].get("bot") or guild_member["user"].get("system"):
             continue
 
-        if guild_member["user"]["id"] > highest_id:
-            highest_id = guild_member["user"]["id"]
+        if int(guild_member["user"]["id"]) > highest_id:
+            highest_id = int(guild_member["user"]["id"])
 
         user: typing.Optional[UserModel] = UserModel.objects(discord_id=guild_member["user"]["id"]).first()
 
@@ -282,7 +282,7 @@ def verify_users(
                 link=verify_member_sub.signature(
                     kwargs={
                         "member": {
-                            "id": guild_member["user"]["id"],
+                            "id": int(guild_member["user"]["id"]),
                             "name": guild_member["nick"]
                             if "nick" in guild_member
                             else guild_member["user"]["username"],
@@ -297,7 +297,7 @@ def verify_users(
                     kwargs={
                         "guild_id": guild.sid,
                         "member": {
-                            "id": guild_member["user"]["id"],
+                            "id": int(guild_member["user"]["id"]),
                             "name": guild_member["nick"]
                             if "nick" in guild_member
                             else guild_member["user"]["username"],
