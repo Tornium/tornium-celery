@@ -330,7 +330,7 @@ def verify_users(
 @celery.shared_task(name="tasks.guild.verify_member_sub", routing_key="quick.verify_member_sub", queue="quick")
 def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id: int, new_data=True):
     if "error" in user_data:
-        if user_data["code"] == 6:
+        if user_data["error"]["code"] == 6:
             payload = {
                 "embeds": [
                     {
@@ -356,6 +356,8 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
                 payload=payload,
                 bucket=f"channels/{log_channel}",
             ).forget()
+            return
+        else:
             return
 
     if user_data["player_id"] == 0:
