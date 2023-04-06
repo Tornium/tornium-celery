@@ -181,7 +181,7 @@ def verify_users(
 
             log_channel = guild.verify_log_channel
 
-    if log_channel > 0:
+    if log_channel > 0 and highest_id == 0:
         try:
             discordpost.delay(
                 endpoint=f"channels/{log_channel}/messages",
@@ -293,19 +293,19 @@ def verify_users(
                         "guild_id": guild.sid,
                     }
                 ),
-                link_error=verify_member_error.signature(
-                    kwargs={
-                        "guild_id": guild.sid,
-                        "member": {
-                            "id": int(guild_member["user"]["id"]),
-                            "name": guild_member["nick"]
-                            if "nick" in guild_member
-                            else guild_member["user"]["username"],
-                            "icon": guild_member["user"].get("avatar"),
-                        },
-                        "log_channel": log_channel,
-                    }
-                ),
+                # link_error=verify_member_error.signature(
+                #     kwargs={
+                #         "guild_id": guild.sid,
+                #         "member": {
+                #             "id": int(guild_member["user"]["id"]),
+                #             "name": guild_member["nick"]
+                #             if "nick" in guild_member
+                #             else guild_member["user"]["username"],
+                #             "icon": guild_member["user"].get("avatar"),
+                #         },
+                #         "log_channel": log_channel,
+                #     }
+                # ),
             )
         else:
             verify_member_sub.signature(
