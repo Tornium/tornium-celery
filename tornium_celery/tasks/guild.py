@@ -335,7 +335,7 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
                 "embeds": [
                     {
                         "title": "API Verification Failed",
-                        "description": f"<@{member['id']} is not officially verified by Torn.",
+                        "description": f"<@{member['id']}> is not officially verified by Torn.",
                         "color": SKYNET_INFO,
                         "author": {
                             "name": member["name"],
@@ -355,6 +355,7 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
                 endpoint=f"channels/{log_channel}/messages",
                 payload=payload,
                 bucket=f"channels/{log_channel}",
+                retry=True,
             ).forget()
             return
         else:
@@ -389,7 +390,7 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
             "embeds": [
                 {
                     "title": "API Verification Failed",
-                    "description": f"<@{member['id']} is not officially verified by Torn.",
+                    "description": f"<@{member['id']}> is not officially verified by Torn.",
                     "color": SKYNET_INFO,
                     "author": {
                         "name": member["name"],
@@ -406,9 +407,7 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
             ] = f"https://cdn.discordapp.com/avatars/{member['id']}/{member['avatar']}.webp"
 
         discordpost.delay(
-            endpoint=f"channels/{log_channel}/messages",
-            payload=payload,
-            bucket=f"channels/{log_channel}",
+            endpoint=f"channels/{log_channel}/messages", payload=payload, bucket=f"channels/{log_channel}", retry=True
         ).forget()
         return
 
@@ -516,7 +515,7 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
             "embeds": [
                 {
                     "title": "API Verification Attempted",
-                    "description": f"<@{member['id']} is officially verified by Torn. Their roles and nickname "
+                    "description": f"<@{member['id']}> is officially verified by Torn. Their roles and nickname "
                     f"have been updated.",
                     "color": SKYNET_INFO,
                     "author": {
@@ -561,7 +560,7 @@ def verify_member_error(
                 "embeds": [
                     {
                         "title": "API Verification Failed",
-                        "description": f"<@{member['id']} is not officially verified by Torn.",
+                        "description": f"<@{member['id']}> is not officially verified by Torn.",
                         "color": SKYNET_INFO,
                         "author": {
                             "name": member["name"],
@@ -619,4 +618,5 @@ def verify_member_error(
         endpoint=f"channels/{log_channel}/messages",
         payload=payload,
         bucket=f"channels/{log_channel}",
+        retry=True,
     ).forget()
