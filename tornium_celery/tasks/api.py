@@ -388,7 +388,6 @@ def discordpost(self, endpoint, payload, session=None, bucket=None, retry=False,
             redis_client.set(
                 f"tornium:discord:ratelimit:bucket:{bucket}",
                 int(request.headers["X-RateLimit-Remaining"]),
-                nx=True,
                 ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
             )
 
@@ -407,7 +406,6 @@ def discordpost(self, endpoint, payload, session=None, bucket=None, retry=False,
         redis_client.set(
             f"tornium:discord:ratelimit:bucket:{bucket}",
             int(request.headers["X-RateLimit-Remaining"]),
-            nx=True,
             ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
         )
 
