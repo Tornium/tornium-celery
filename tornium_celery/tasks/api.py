@@ -42,6 +42,7 @@ def tornget(
     fromts=0,
     stat="",
     session=None,
+    pass_error=False,
 ):
     url = (
         f'https://api.torn.com/{endpoint}&key={key}&comment=Tornium{"" if fromts == 0 else f"&from={fromts}"}'
@@ -84,7 +85,7 @@ def tornget(
     else:
         request = request.json()
 
-    if "error" in request:
+    if "error" in request and not pass_error:
         if request["error"]["code"] in (7, 10, 13):
             remove_key_error.delay(key, request["error"]["code"]).forget()
 

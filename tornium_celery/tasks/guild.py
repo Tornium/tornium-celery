@@ -275,6 +275,7 @@ def verify_users(
                 kwargs={
                     "endpoint": f"user/{guild_member['user']['id']}?selections=discord,profile",
                     "key": random.choice(admin_keys),
+                    "pass_error": True,
                 },
                 queue="api",
             ).apply_async(
@@ -293,19 +294,6 @@ def verify_users(
                         "guild_id": guild.sid,
                     }
                 ),
-                # link_error=verify_member_error.signature(
-                #     kwargs={
-                #         "guild_id": guild.sid,
-                #         "member": {
-                #             "id": int(guild_member["user"]["id"]),
-                #             "name": guild_member["nick"]
-                #             if "nick" in guild_member
-                #             else guild_member["user"]["username"],
-                #             "icon": guild_member["user"].get("avatar"),
-                #         },
-                #         "log_channel": log_channel,
-                #     }
-                # ),
             )
         else:
             verify_member_sub.signature(
@@ -341,6 +329,35 @@ def verify_users(
 
 @celery.shared_task(name="tasks.guild.verify_member_sub", routing_key="quick.verify_member_sub", queue="quick")
 def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id: int, new_data=True):
+    if "error" in user_data:
+        if user_data["code"] == 6:
+            payload = {
+                "embeds": [
+                    {
+                        "title": "API Verification Failed",
+                        "description": f"<@{member['id']} is not officially verified by Torn.",
+                        "color": SKYNET_INFO,
+                        "author": {
+                            "name": member["name"],
+                            "url": f"https://discord.com/users/{member['id']}",
+                        },
+                        "timestamp": datetime.datetime.utcnow().isoformat(),
+                    }
+                ]
+            }
+
+            if member["avatar"] is not None:
+                payload["embeds"][0]["author"][
+                    "icon_url"
+                ] = f"https://cdn.discordapp.com/avatars/{member['id']}/{member['avatar']}.webp"
+
+            discordpost.delay(
+                endpoint=f"channels/{log_channel}/messages",
+                payload=payload,
+                bucket=f"channels/{log_channel}",
+            ).forget()
+            return
+
     if user_data["player_id"] == 0:
         return
 
