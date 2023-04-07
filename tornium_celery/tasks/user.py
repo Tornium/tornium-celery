@@ -171,7 +171,7 @@ def update_user_self(user_data, key=None):
         logger.exception(e)
 
 
-@celery.shared_task(routing_key="quick.update_user_other", queue="quick")
+@celery.shared_task(name="tasks.user.update_user_other", routing_key="quick.update_user_other", queue="quick")
 def update_user_other(user_data):
     user: UserModel = UserModel.objects(tid=user_data["player_id"]).modify(
         upsert=True,
