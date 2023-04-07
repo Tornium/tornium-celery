@@ -687,7 +687,6 @@ def retal_attacks(faction_data, last_attacks=None):
             discordpost.delay(
                 f"channels/{guild.retal_config[str(faction.tid)]['channel']}/messages",
                 payload,
-                bucket=f"channels/{guild.retal_config[str(faction.tid)]}",
             ).forget()
         except DiscordError as e:
             if e.code == 10003:

@@ -21,7 +21,6 @@ import typing
 
 import celery
 import jinja2
-import requests
 from celery.utils.log import get_task_logger
 from tornium_commons import rds
 from tornium_commons.errors import DiscordError, NetworkingError, TornError
@@ -36,10 +35,8 @@ logger = get_task_logger(__name__)
 
 @celery.shared_task(name="tasks.guild.refresh_guilds", routing_key="default.refresh_guilds", queue="default")
 def refresh_guilds():
-    requests_session = requests.Session()
-
     try:
-        guilds = discordget("users/@me/guilds", session=requests_session)
+        guilds = discordget("users/@me/guilds")
     except Exception as e:
         logger.exception(e)
         return
@@ -70,7 +67,7 @@ def refresh_guilds():
             guild_db.save()
 
         try:
-            members = discordget(f'guilds/{guild["id"]}/members?limit=1000', session=requests_session)
+            members = discordget(f'guilds/{guild["id"]}/members?limit=1000')
         except DiscordError as e:
             if e.code == 10007:
                 continue
@@ -82,7 +79,7 @@ def refresh_guilds():
             continue
 
         try:
-            guild = discordget(f'guilds/{guild["id"]}', session=requests_session)
+            guild = discordget(f'guilds/{guild["id"]}')
         except Exception as e:
             logger.exception(e)
             continue
@@ -157,7 +154,6 @@ def verify_users(
 
     server_data = discordget(
         f"guilds/{guild.sid}?with_counts=true",
-        bucket=f"guilds/{guild.sid}",
     )
 
     redis_client = rds()
@@ -175,7 +171,7 @@ def verify_users(
             log_channel = -1
         else:
             try:
-                discordget(f"channels/{guild.verify_log_channel}", bucket=f"channels/{guild.verify_log_channel}")
+                discordget(f"channels/{guild.verify_log_channel}")
             except (DiscordError, NetworkingError):
                 raise LookupError("Unknown log channel")
 
@@ -201,7 +197,6 @@ def verify_users(
                         }
                     ]
                 },
-                bucket=f"channels/{log_channel}",
             ).forget()
         except (DiscordError, NetworkingError):
             pass
@@ -218,7 +213,6 @@ def verify_users(
     try:
         guild_members: list = discordget(
             f"guilds/{guild.sid}/members?limit={30 * len(admin_keys)}&after={highest_id}",
-            bucket=f"guilds/{guild.sid}",
         )
     except DiscordError as e:
         if log_channel > 0:
@@ -233,7 +227,6 @@ def verify_users(
                         }
                     ]
                 },
-                bucket=f"channels/{log_channel}",
             ).forget()
 
         raise e
@@ -250,7 +243,6 @@ def verify_users(
                         }
                     ]
                 },
-                bucket=f"channels/{log_channel}",
             ).forget()
 
         raise e
@@ -354,8 +346,6 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
             discordpost.delay(
                 endpoint=f"channels/{log_channel}/messages",
                 payload=payload,
-                bucket=f"channels/{log_channel}",
-                retry=True,
             ).forget()
             return
         else:
@@ -406,9 +396,7 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
                 "icon_url"
             ] = f"https://cdn.discordapp.com/avatars/{member['id']}/{member['avatar']}.webp"
 
-        discordpost.delay(
-            endpoint=f"channels/{log_channel}/messages", payload=payload, bucket=f"channels/{log_channel}", retry=True
-        ).forget()
+        discordpost.delay(endpoint=f"channels/{log_channel}/messages", payload=payload).forget()
         return
 
     patch_json = {}
@@ -506,8 +494,6 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
     discordpost.delay(
         endpoint=f"guilds/{guild_id}/members/{user.discord_id}",
         payload=patch_json,
-        bucket=f"guilds/{guild_id}",
-        retry=True,
     ).forget()
 
     if log_channel > 0:
@@ -535,8 +521,6 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
         discordpost.delay(
             endpoint=f"channels/{log_channel}/messages",
             payload=payload,
-            bucket=f"channels/{log_channel}",
-            retry=True,
         ).forget()
 
 
@@ -617,6 +601,4 @@ def verify_member_error(
     discordpost.delay(
         endpoint=f"channels/{log_channel}/messages",
         payload=payload,
-        bucket=f"channels/{log_channel}",
-        retry=True,
     ).forget()

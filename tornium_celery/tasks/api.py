@@ -15,15 +15,16 @@
 
 import datetime
 import json
-import math
 import random
+import time
+import typing
 
 if globals().get("orjson:loaded"):
     import orjson
 
 import celery
 import requests
-from tornium_commons import Config, rds
+from tornium_commons import Config, DBucket, rds
 from tornium_commons.errors import (
     DiscordError,
     MissingKeyError,
@@ -33,6 +34,37 @@ from tornium_commons.errors import (
 )
 
 from .misc import remove_key_error, remove_unknown_channel, remove_unknown_role
+
+
+def backoff(self: celery.Task):
+    return int(1 + random.uniform(0, self.request.retries) ** self.request.retries)
+
+
+def discord_ratelimit_pre(
+    self: celery.Task,
+    method: typing.Literal["GET", "PATCH", "POST", "PUT", "DELETE"],
+    endpoint: str,
+    backoff_var: bool = False,
+):
+    redis_client = rds()
+    redis_client.set(f"tornium:discord:ratelimit:global:{int(time.time()) % 3600}", 50, nx=True, ex=60)
+
+    try:
+        if int(redis_client.get(f"tornium:discord:ratelimit:global:{int(time.time()) % 3600}")) < 1:
+            raise self.retry(countdown=1 if backoff_var is False else backoff(self))
+    except TypeError:
+        raise self.retry(countdown=1)
+
+    bucket = DBucket.from_endpoint(method=method, endpoint=endpoint)
+    bucket.refresh_bucket()
+
+    try:
+        bucket.verify()
+    except RatelimitError:
+        raise self.retry(countdown=1 if backoff_var is False else backoff(self))
+
+    redis_client.decrby(f"tornium:discord:ratelimit:global:{int(time.time()) % 3600}", 1)
+    bucket.call()
 
 
 @celery.shared_task(name="tasks.api.tornget", time_limit=5, routing_key="api.tornget", queue="api")
@@ -96,84 +128,18 @@ def tornget(
 
 
 @celery.shared_task(name="tasks.api.discordget", bind=True, max_retries=3, routing_key="api.discordget", queue="api")
-def discordget(self, endpoint, session=None, bucket=None, retry=False, *args, **kwargs):
+def discordget(self: celery.Task, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {"Authorization": f'Bot {Config()["skynet-bottoken"]}'}
-    redis_client = rds()
 
-    if redis_client.exists("tornium:discord:ratelimit:global"):
-        if retry:
-            self.retry(countdown=redis_client.ttl("tornium:discord:ratelimit:global"))
-        else:
-            raise RatelimitError
+    discord_ratelimit_pre(self, "GET", endpoint, bool(kwargs.get("backoff")))
 
-    try:
-        if bucket is not None and int(redis_client.get(f"tornium:discord:ratelimit:bucket:{bucket}")) <= 0:
-            if retry:
-                self.retry(
-                    countdown=(redis_client.ttl(f"tornium:discord:ratelimit:bucket:{bucket}") + 1)
-                    + 10 * random.random()
-                )
-            else:
-                raise RatelimitError
-        elif bucket is not None:  # and bucket > 0
-            redis_client.decrby(f"tornium:discord:ratelimit:bucket:{bucket}", 1)
-    except TypeError:
-        pass
+    request = requests.get(url, headers=headers)
 
-    if session is None:
-        request = requests.get(url, headers=headers)
-    else:
-        request = session.get(url, headers=headers)
+    DBucket.update_bucket(request.headers, "GET", endpoint)
 
     if request.status_code == 429:
-        if (
-            bucket is not None
-            and "X-RateLimit-Global" in request.headers
-            and request.headers["X-RateLimit-Global"] in ("true", "True", True)
-            and not redis_client.exists("tornium:discord:ratelimit:global")
-        ):
-            redis_client.set(
-                "tornium:discord:ratelimit:global",
-                1,
-                nx=True,
-                ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-            )
-
-            if retry:
-                self.retry(countdown=redis_client.ttl("tornium:discord:ratelimit:global"))
-            else:
-                raise RatelimitError
-        elif (
-            bucket is not None
-            and "X-RateLimit-Remaining" in request.headers
-            and "X-RateLimit-ResetAfter" in request.headers
-        ):
-            redis_client.set(
-                f"tornium:discord:ratelimit:bucket:{bucket}",
-                int(request.headers["X-RateLimit-Remaining"]),
-                nx=True,
-                ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-            )
-
-            if retry:
-                self.retry(
-                    countdown=(redis_client.ttl(f"tornium:discord:ratelimit:bucket:{bucket}") + 1)
-                    + 10 * random.random()
-                )
-            else:
-                raise RatelimitError
-    elif (
-        bucket is not None
-        and "X-RateLimit-Remaining" in request.headers
-        and "X-RateLimit-ResetAfter" in request.headers
-    ):
-        redis_client.set(
-            f"tornium:discord:ratelimit:bucket:{bucket}",
-            int(request.headers["X-RateLimit-Remaining"]),
-            nx=True,
-            ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-        )
+        raise RatelimitError
 
     try:
         if globals().get("orjson:loaded"):
@@ -207,92 +173,26 @@ def discordget(self, endpoint, session=None, bucket=None, retry=False, *args, **
 @celery.shared_task(
     name="tasks.api.discordpatch", bind=True, max_retries=3, routing_key="api.discordpatch", queue="api"
 )
-def discordpatch(self, endpoint, payload, session=None, bucket=None, retry=False, *args, **kwargs):
+def discordpatch(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
         "Authorization": f'Bot {Config()["skynet-bottoken"]}',
         "Content-Type": "application/json",
     }
-    redis_client = rds()
 
-    if redis_client.exists("tornium:discord:ratelimit:global"):
-        if retry:
-            self.retry(countdown=redis_client.ttl("tornium:discord:ratelimit:global"))
-        else:
-            raise RatelimitError
-
-    try:
-        if bucket is not None and int(redis_client.get(f"tornium:discord:ratelimit:bucket:{bucket}")) <= 0:
-            if retry:
-                self.retry(
-                    countdown=(redis_client.ttl(f"tornium:discord:ratelimit:bucket:{bucket}") + 1)
-                    + 10 * random.random()
-                )
-            else:
-                raise RatelimitError
-        elif bucket is not None:  # and bucket > 0
-            redis_client.decrby(f"tornium:discord:ratelimit:bucket:{bucket}", 1)
-    except TypeError:
-        pass
+    discord_ratelimit_pre(self, "PATCH", endpoint, bool(kwargs.get("backoff")))
 
     if globals().get("orjson:loaded"):
         payload = orjson.dumps(payload)
     else:
         payload = json.dumps(payload)
 
-    if session is None:
-        request = requests.patch(url, headers=headers, data=payload)
-    else:
-        request = session.patch(url, headers=headers, data=payload)
+    request = requests.patch(url, headers=headers, data=payload)
+
+    DBucket.update_bucket(request.headers, "PATCH", endpoint)
 
     if request.status_code == 429:
-        if (
-            bucket is not None
-            and "X-RateLimit-Global" in request.headers
-            and request.headers["X-RateLimit-Global"] in ("true", "True", True)
-            and not redis_client.exists("tornium:discord:ratelimit:global")
-        ):
-            redis_client.set(
-                "tornium:discord:ratelimit:global",
-                1,
-                nx=True,
-                ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-            )
-
-            if retry:
-                self.retry(countdown=redis_client.ttl("tornium:discord:ratelimit:global"))
-            else:
-                raise RatelimitError
-        elif (
-            bucket is not None
-            and "X-RateLimit-Remaining" in request.headers
-            and "X-RateLimit-ResetAfter" in request.headers
-        ):
-            redis_client.set(
-                f"tornium:discord:ratelimit:bucket:{bucket}",
-                int(request.headers["X-RateLimit-Remaining"]),
-                nx=True,
-                ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-            )
-
-            if retry:
-                self.retry(
-                    countdown=(redis_client.ttl(f"tornium:discord:ratelimit:bucket:{bucket}") + 1)
-                    + 10 * random.random()
-                )
-            else:
-                raise RatelimitError
-    elif (
-        bucket is not None
-        and "X-RateLimit-Remaining" in request.headers
-        and "X-RateLimit-ResetAfter" in request.headers
-    ):
-        redis_client.set(
-            f"tornium:discord:ratelimit:bucket:{bucket}",
-            int(request.headers["X-RateLimit-Remaining"]),
-            nx=True,
-            ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-        )
+        raise RatelimitError
 
     try:
         if globals().get("orjson:loaded"):
@@ -324,90 +224,24 @@ def discordpatch(self, endpoint, payload, session=None, bucket=None, retry=False
 
 
 @celery.shared_task(name="tasks.api.discordpost", bind=True, max_retries=3, routing_key="api.discordpost", queue="api")
-def discordpost(self, endpoint, payload, session=None, bucket=None, retry=False, *args, **kwargs):
+def discordpost(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
         "Authorization": f'Bot {Config()["skynet-bottoken"]}',
         "Content-Type": "application/json",
     }
-    redis_client = rds()
 
-    if redis_client.exists("tornium:discord:ratelimit:global"):
-        if retry:
-            self.retry(countdown=redis_client.ttl("tornium:discord:ratelimit:global"))
-        else:
-            raise RatelimitError
-
-    try:
-        if bucket is not None and int(redis_client.get(f"tornium:discord:ratelimit:bucket:{bucket}")) <= 0:
-            if retry:
-                self.retry(
-                    countdown=(redis_client.ttl(f"tornium:discord:ratelimit:bucket:{bucket}") + 1)
-                    + 10 * random.random()
-                )
-            else:
-                raise RatelimitError
-        elif bucket is not None:  # and bucket > 0
-            redis_client.decrby(f"tornium:discord:ratelimit:bucket:{bucket}", 1)
-    except TypeError:
-        pass
+    discord_ratelimit_pre(self, "POST", endpoint, bool(kwargs.get("backoff")))
 
     if globals().get("orjson:loaded"):
         payload = orjson.dumps(payload)
     else:
         payload = json.dumps(payload)
 
-    if session is None:
-        request = requests.post(url, headers=headers, data=payload)
-    else:
-        request = session.post(url, headers=headers, data=payload)
+    request = requests.post(url, headers=headers, data=payload)
 
     if request.status_code == 429:
-        if (
-            bucket is not None
-            and "X-RateLimit-Global" in request.headers
-            and request.headers["X-RateLimit-Global"] in ("true", "True", True)
-            and not redis_client.exists("tornium:discord:ratelimit:global")
-        ):
-            redis_client.set(
-                "tornium:discord:ratelimit:global",
-                1,
-                nx=True,
-                ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-            )
-
-            if retry:
-                self.retry(countdown=redis_client.ttl("tornium:discord:ratelimit:global"))
-            else:
-                raise RatelimitError
-        elif (
-            bucket is not None
-            and "X-RateLimit-Remaining" in request.headers
-            and "X-RateLimit-ResetAfter" in request.headers
-        ):
-            redis_client.set(
-                f"tornium:discord:ratelimit:bucket:{bucket}",
-                int(request.headers["X-RateLimit-Remaining"]),
-                ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-            )
-
-            if retry:
-                self.retry(
-                    countdown=(redis_client.ttl(f"tornium:discord:ratelimit:bucket:{bucket}") + 1)
-                    + 10 * random.random()
-                )
-            else:
-                raise RatelimitError
-    elif (
-        bucket is not None
-        and "X-RateLimit-Remaining" in request.headers
-        and "X-RateLimit-ResetAfter" in request.headers
-    ):
-        redis_client.set(
-            f"tornium:discord:ratelimit:bucket:{bucket}",
-            int(request.headers["X-RateLimit-Remaining"]),
-            ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-        )
+        raise RatelimitError
 
     try:
         if globals().get("orjson:loaded"):
@@ -439,92 +273,24 @@ def discordpost(self, endpoint, payload, session=None, bucket=None, retry=False,
 
 
 @celery.shared_task(name="tasks.api.discordput", bind=True, max_retries=3, routing_key="api.discordput", queue="api")
-def discordput(self, endpoint, payload, session=None, bucket=None, retry=False, *args, **kwargs):
+def discordput(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
         "Authorization": f'Bot {Config()["skynet-bottoken"]}',
         "Content-Type": "application/json",
     }
-    redis_client = rds()
 
-    if redis_client.exists("tornium:discord:ratelimit:global"):
-        if retry:
-            self.retry(countdown=redis_client.ttl("tornium:discord:ratelimit:global"))
-        else:
-            raise RatelimitError
-
-    try:
-        if bucket is not None and int(redis_client.get(f"tornium:discord:ratelimit:bucket:{bucket}")) <= 0:
-            if retry:
-                self.retry(
-                    countdown=(redis_client.ttl(f"tornium:discord:ratelimit:bucket:{bucket}") + 1)
-                    + 10 * random.random()
-                )
-            else:
-                raise RatelimitError
-        elif bucket is not None:  # and bucket > 0
-            redis_client.decrby(f"tornium:discord:ratelimit:bucket:{bucket}", 1)
-    except TypeError:
-        pass
+    discord_ratelimit_pre(self, "PUT", endpoint, bool(kwargs.get("backoff")))
 
     if globals().get("orjson:loaded"):
         payload = orjson.dumps(payload)
     else:
         payload = json.dumps(payload)
 
-    if session is None:
-        request = requests.put(url, headers=headers, data=payload)
-    else:
-        request = session.put(url, headers=headers, data=payload)
+    request = requests.put(url, headers=headers, data=payload)
 
     if request.status_code == 429:
-        if (
-            bucket is not None
-            and "X-RateLimit-Global" in request.headers
-            and request.headers["X-RateLimit-Global"] in ("true", "True", True)
-            and not redis_client.exists("tornium:discord:ratelimit:global")
-        ):
-            redis_client.set(
-                "tornium:discord:ratelimit:global",
-                1,
-                nx=True,
-                ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-            )
-
-            if retry:
-                self.retry(countdown=redis_client.ttl("tornium:discord:ratelimit:global"))
-            else:
-                raise RatelimitError
-        elif (
-            bucket is not None
-            and "X-RateLimit-Remaining" in request.headers
-            and "X-RateLimit-ResetAfter" in request.headers
-        ):
-            redis_client.set(
-                f"tornium:discord:ratelimit:bucket:{bucket}",
-                int(request.headers["X-RateLimit-Remaining"]),
-                nx=True,
-                ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-            )
-
-            if retry:
-                self.retry(
-                    countdown=(redis_client.ttl(f"tornium:discord:ratelimit:bucket:{bucket}") + 1)
-                    + 10 * random.random()
-                )
-            else:
-                raise RatelimitError
-    elif (
-        bucket is not None
-        and "X-RateLimit-Remaining" in request.headers
-        and "X-RateLimit-ResetAfter" in request.headers
-    ):
-        redis_client.set(
-            f"tornium:discord:ratelimit:bucket:{bucket}",
-            int(request.headers["X-RateLimit-Remaining"]),
-            nx=True,
-            ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-        )
+        raise RatelimitError
 
     try:
         if globals().get("orjson:loaded"):
@@ -558,87 +324,19 @@ def discordput(self, endpoint, payload, session=None, bucket=None, retry=False, 
 @celery.shared_task(
     name="tasks.api.discorddelete", bind=True, max_retries=3, routing_key="api.discorddelete", queue="api"
 )
-def discorddelete(self, endpoint, session=None, bucket=None, retry=False, *args, **kwargs):
+def discorddelete(self, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
         "Authorization": f'Bot {Config()["skynet-bottoken"]}',
         "Content-Type": "application/json",
     }
-    redis_client = rds()
 
-    if redis_client.exists("tornium:discord:ratelimit:global"):
-        if retry:
-            self.retry(countdown=redis_client.ttl("tornium:discord:ratelimit:global"))
-        else:
-            raise RatelimitError
+    discord_ratelimit_pre(self, "GET", endpoint, bool(kwargs.get("backoff")))
 
-    try:
-        if bucket is not None and int(redis_client.get(f"tornium:discord:ratelimit:bucket:{bucket}")) <= 0:
-            if retry:
-                self.retry(
-                    countdown=(redis_client.ttl(f"tornium:discord:ratelimit:bucket:{bucket}") + 1)
-                    + 10 * random.random()
-                )
-            else:
-                raise RatelimitError
-        elif bucket is not None:  # and bucket > 0
-            redis_client.decrby(f"tornium:discord:ratelimit:bucket:{bucket}", 1)
-    except TypeError:
-        pass
-
-    if session is None:
-        request = requests.delete(url, headers=headers)
-    else:
-        request = session.delete(url, headers=headers)
+    request = requests.delete(url, headers=headers)
 
     if request.status_code == 429:
-        if (
-            bucket is not None
-            and "X-RateLimit-Global" in request.headers
-            and request.headers["X-RateLimit-Global"] in ("true", "True", True)
-            and not redis_client.exists("tornium:discord:ratelimit:global")
-        ):
-            redis_client.set(
-                "tornium:discord:ratelimit:global",
-                1,
-                nx=True,
-                ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-            )
-
-            if retry:
-                self.retry(countdown=redis_client.ttl("tornium:discord:ratelimit:global"))
-            else:
-                raise RatelimitError
-        elif (
-            bucket is not None
-            and "X-RateLimit-Remaining" in request.headers
-            and "X-RateLimit-ResetAfter" in request.headers
-        ):
-            redis_client.set(
-                f"tornium:discord:ratelimit:bucket:{bucket}",
-                int(request.headers["X-RateLimit-Remaining"]),
-                nx=True,
-                ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-            )
-
-            if retry:
-                self.retry(
-                    countdown=(redis_client.ttl(f"tornium:discord:ratelimit:bucket:{bucket}") + 1)
-                    + 10 * random.random()
-                )
-            else:
-                raise RatelimitError
-    elif (
-        bucket is not None
-        and "X-RateLimit-Remaining" in request.headers
-        and "X-RateLimit-ResetAfter" in request.headers
-    ):
-        redis_client.set(
-            f"tornium:discord:ratelimit:bucket:{bucket}",
-            int(request.headers["X-RateLimit-Remaining"]),
-            nx=True,
-            ex=math.ceil(float(request.headers["X-RateLimit-ResetAfter"])),
-        )
+        raise RatelimitError
 
     try:
         if globals().get("orjson:loaded"):

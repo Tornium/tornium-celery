@@ -64,14 +64,11 @@ def send_notification(notification: NotificationModel, payload: dict):
         except NetworkingError:
             return
 
-        discordpost.delay(
-            endpoint=f"channels/{dm_channel['id']}/messages", payload=payload, bucket=f"channels/{dm_channel['id']}"
-        ).forget()
+        discordpost.delay(endpoint=f"channels/{dm_channel['id']}/messages", payload=payload).forget()
     elif notification.recipient_type == 1:
         discordpost.delay(
             endpoint=f"channels/{notification.recipient}/messages",
             payload=payload,
-            bucket=f"channels/{notification.recipient}",
         ).forget()
     else:
         return
