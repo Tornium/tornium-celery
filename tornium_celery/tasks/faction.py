@@ -488,7 +488,7 @@ def retal_attacks(faction_data, last_attacks=None):
         return
 
     try:
-        if guild.retal_config[str(faction.tid)]["channel"] == 0:
+        if guild.retal_config[str(faction.tid)]["channel"] in ("0", 0, None, ""):
             return
     except KeyError:
         return
