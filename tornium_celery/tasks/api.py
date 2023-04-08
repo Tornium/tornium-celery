@@ -245,6 +245,8 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
 
     request = requests.post(url, headers=headers, data=payload)
 
+    DBucket.update_bucket(request.headers, "GET", endpoint)
+
     if request.status_code == 429:
         raise RatelimitError
 
@@ -294,6 +296,8 @@ def discordput(self, endpoint, payload, *args, **kwargs):
 
     request = requests.put(url, headers=headers, data=payload)
 
+    DBucket.update_bucket(request.headers, "GET", endpoint)
+
     if request.status_code == 429:
         raise RatelimitError
 
@@ -339,6 +343,8 @@ def discorddelete(self, endpoint, *args, **kwargs):
     discord_ratelimit_pre(self, "GET", endpoint, backoff_var=kwargs.get("backoff"))
 
     request = requests.delete(url, headers=headers)
+
+    DBucket.update_bucket(request.headers, "GET", endpoint)
 
     if request.status_code == 429:
         raise RatelimitError
