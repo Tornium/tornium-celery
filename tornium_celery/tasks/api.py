@@ -61,6 +61,8 @@ def discord_ratelimit_pre(
     bucket = DBucket.from_endpoint(method=method, endpoint=endpoint)
     bucket.refresh_bucket()
 
+    print(f"{method}|{endpoint.split('?')[0]} :: {bucket.remaining}/{bucket.limit}")
+
     try:
         bucket.verify()
     except RatelimitError:
