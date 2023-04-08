@@ -54,9 +54,9 @@ def discord_ratelimit_pre(
 
     try:
         if int(redis_client.get(f"tornium:discord:ratelimit:global:{int(time.time()) % 3600}")) < 1:
-            raise self.retry(countdown=1 if backoff_var is False else backoff(self))
+            raise self.retry(countdown=backoff(self) if backoff_var else 1)
     except TypeError:
-        raise self.retry(countdown=1)
+        raise self.retry(countdown=backoff(self) if backoff_var else 1)
 
     bucket = DBucket.from_endpoint(method=method, endpoint=endpoint)
     bucket.refresh_bucket()
@@ -64,7 +64,7 @@ def discord_ratelimit_pre(
     try:
         bucket.verify()
     except RatelimitError:
-        raise self.retry(countdown=1 if backoff_var is False else backoff(self))
+        raise self.retry(countdown=backoff(self) if backoff_var else 1)
 
     redis_client.decrby(f"tornium:discord:ratelimit:global:{int(time.time()) % 3600}", 1)
     bucket.call()
