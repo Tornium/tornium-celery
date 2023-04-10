@@ -24,6 +24,7 @@ if globals().get("orjson:loaded"):
 
 import celery
 import requests
+from celery.utils.log import get_task_logger
 from tornium_commons import Config, DBucket, rds
 from tornium_commons.errors import (
     DiscordError,
@@ -34,6 +35,8 @@ from tornium_commons.errors import (
 )
 
 from .misc import remove_key_error, remove_unknown_channel, remove_unknown_role
+
+logger = get_task_logger(__name__)
 
 
 def backoff(self: celery.Task):
@@ -163,7 +166,9 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
         # See https://discord.com/developers/docs/topics/opcodes-and-status-codes#json for a full list of error codes
         # explanations
 
-        if request_json["code"] == 10003:
+        if request_json["code"] == 0:
+            logger.info(request_json)
+        elif request_json["code"] == 10003:
             if kwargs.get("channel") is not None:
                 remove_unknown_channel.delay(kwargs.get("channel")).forget()
         elif request_json["code"] == 10011:
@@ -216,7 +221,9 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
         # See https://discord.com/developers/docs/topics/opcodes-and-status-codes#json for a full list of error codes
         # explanations
 
-        if request_json["code"] == 10003:
+        if request_json["code"] == 0:
+            logger.info(request_json)
+        elif request_json["code"] == 10003:
             if kwargs.get("channel") is not None:
                 remove_unknown_channel.delay(kwargs.get("channel")).forget()
         elif request_json["code"] == 10011:
@@ -267,7 +274,9 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
         # See https://discord.com/developers/docs/topics/opcodes-and-status-codes#json for a full list of error codes
         # explanations
 
-        if request_json["code"] == 10003:
+        if request_json["code"] == 0:
+            logger.info(request_json)
+        elif request_json["code"] == 10003:
             if kwargs.get("channel") is not None:
                 remove_unknown_channel.delay(kwargs.get("channel")).forget()
         elif request_json["code"] == 10011:
@@ -318,7 +327,9 @@ def discordput(self, endpoint, payload, *args, **kwargs):
         # See https://discord.com/developers/docs/topics/opcodes-and-status-codes#json for a full list of error codes
         # explanations
 
-        if request_json["code"] == 10003:
+        if request_json["code"] == 0:
+            logger.info(request_json)
+        elif request_json["code"] == 10003:
             if kwargs.get("channel") is not None:
                 remove_unknown_channel.delay(kwargs.get("channel")).forget()
         elif request_json["code"] == 10011:
@@ -366,7 +377,9 @@ def discorddelete(self, endpoint, *args, **kwargs):
         # See https://discord.com/developers/docs/topics/opcodes-and-status-codes#json for a full list of error codes
         # explanations
 
-        if request_json["code"] == 10003:
+        if request_json["code"] == 0:
+            logger.info(request_json)
+        elif request_json["code"] == 10003:
             if kwargs.get("channel") is not None:
                 remove_unknown_channel.delay(kwargs.get("channel")).forget()
         elif request_json["code"] == 10011:
