@@ -520,7 +520,7 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
             ]
         }
 
-        if member["avatar"] is not None:
+        if member.get("avatar") is not None:
             payload["embeds"][0]["author"][
                 "icon_url"
             ] = f"https://cdn.discordapp.com/avatars/{member['id']}/{member['avatar']}.webp"
