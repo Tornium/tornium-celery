@@ -305,18 +305,18 @@ def verify_users(
                 }
             )
 
-    verify_users.signature(
-        kwargs={
-            "guild_id": guild_id,
-            "admin_keys": admin_keys,
-            "force": force,
-            "highest_id": highest_id,
-            "log_channel": log_channel,
-        }
-    ).apply_async(
-        countdown=60,
-        expires=300,
-    ).forget()
+    # verify_users.signature(
+    #     kwargs={
+    #         "guild_id": guild_id,
+    #         "admin_keys": admin_keys,
+    #         "force": force,
+    #         "highest_id": highest_id,
+    #         "log_channel": log_channel,
+    #     }
+    # ).apply_async(
+    #     countdown=60,
+    #     expires=300,
+    # ).forget()
 
 
 @celery.shared_task(name="tasks.guild.verify_member_sub", routing_key="quick.verify_member_sub", queue="quick")
