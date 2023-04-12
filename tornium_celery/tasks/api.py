@@ -67,12 +67,12 @@ def discord_ratelimit_pre(
     except TypeError:
         raise self.retry(countdown=backoff(self) if backoff_var else countdown_wo())
 
-    bucket = DBucket.from_endpoint(method=method, endpoint=endpoint)
-    bucket.refresh_bucket()
-
-    print(f"{method}|{endpoint.split('?')[0]} :: {bucket.remaining}/{bucket.limit}")
-
     try:
+        bucket = DBucket.from_endpoint(method=method, endpoint=endpoint)
+        bucket.refresh_bucket()
+
+        print(f"{method}|{endpoint.split('?')[0]} :: {bucket.remaining}/{bucket.limit}")
+
         bucket.verify()
     except RatelimitError:
         raise self.retry(countdown=backoff(self) if backoff_var else countdown_wo())

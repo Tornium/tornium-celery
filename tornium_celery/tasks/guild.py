@@ -28,7 +28,7 @@ from tornium_commons.formatters import torn_timestamp
 from tornium_commons.models import PositionModel, ServerModel, UserModel
 from tornium_commons.skyutils import SKYNET_ERROR, SKYNET_INFO
 
-from .api import discordget, discordpost, tornget
+from .api import discordget, discordpatch, discordpost, tornget
 
 logger = get_task_logger(__name__)
 
@@ -322,40 +322,8 @@ def verify_users(
 @celery.shared_task(name="tasks.guild.verify_member_sub", routing_key="quick.verify_member_sub", queue="quick")
 def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id: int, new_data=True):
     if "error" in user_data:
-        # WARNING: Disabled to maintain server performance and Discord ratelimit
-        #
-        # if user_data["error"]["code"] == 6:
-        #     payload = {
-        #         "embeds": [
-        #             {
-        #                 "title": "API Verification Failed",
-        #                 "description": f"<@{member['id']}> is not officially verified by Torn.",
-        #                 "color": SKYNET_INFO,
-        #                 "author": {
-        #                     "name": member["name"],
-        #                     "url": f"https://discord.com/users/{member['id']}",
-        #                 },
-        #                 "timestamp": datetime.datetime.utcnow().isoformat(),
-        #             }
-        #         ]
-        #     }
-        #
-        #     if member.get("avatar") is not None:
-        #         payload["embeds"][0]["author"][
-        #             "icon_url"
-        #         ] = f"https://cdn.discordapp.com/avatars/{member['id']}/{member['avatar']}.webp"
-        #
-        #     discordpost.delay(
-        #         endpoint=f"channels/{log_channel}/messages",
-        #         payload=payload,
-        #     ).forget()
-        #     return
-        # else:
-        #     return
-
         return
-
-    if user_data["player_id"] == 0:
+    elif user_data["player_id"] == 0:
         return
 
     if new_data:
@@ -379,30 +347,6 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
     if user.discord_id in (0, None, ""):
         if log_channel == -1:
             return
-
-        # WARNING: Disabled to maintain server performance and Discord ratelimit
-        #
-        # payload = {
-        #     "embeds": [
-        #         {
-        #             "title": "API Verification Failed",
-        #             "description": f"<@{member['id']}> is not officially verified by Torn.",
-        #             "color": SKYNET_INFO,
-        #             "author": {
-        #                 "name": member["name"],
-        #                 "url": f"https://discord.com/users/{member['id']}",
-        #             },
-        #             "timestamp": datetime.datetime.utcnow().isoformat(),
-        #         }
-        #     ]
-        # }
-        #
-        # if member["avatar"] is not None:
-        #     payload["embeds"][0]["author"][
-        #         "icon_url"
-        #     ] = f"https://cdn.discordapp.com/avatars/{member['id']}/{member['avatar']}.webp"
-        #
-        # discordpost.delay(endpoint=f"channels/{log_channel}/messages", payload=payload).forget()
         return
 
     patch_json = {}
@@ -498,7 +442,7 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
     if len(patch_json) == 0:
         return
 
-    discordpost.delay(
+    discordpatch.delay(
         endpoint=f"guilds/{guild_id}/members/{user.discord_id}",
         payload=patch_json,
     ).forget()
