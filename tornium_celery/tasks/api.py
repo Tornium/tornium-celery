@@ -58,27 +58,17 @@ def discord_ratelimit_pre(
     if backoff_var is None:
         backoff_var = True
 
-    redis_client = rds()
-    redis_client.set(f"tornium:discord:ratelimit:global:{int(time.time()) % 3600}", 50, nx=True, ex=60)
-
-    try:
-        if int(redis_client.get(f"tornium:discord:ratelimit:global:{int(time.time()) % 3600}")) < 1:
-            raise self.retry(countdown=backoff(self) if backoff_var else countdown_wo())
-    except TypeError:
-        raise self.retry(countdown=backoff(self) if backoff_var else countdown_wo())
-
     try:
         bucket = DBucket.from_endpoint(method=method, endpoint=endpoint)
-        bucket.refresh_bucket()
-
-        print(f"{method}|{endpoint.split('?')[0]} :: {bucket.remaining}/{bucket.limit}")
-
-        bucket.verify()
     except RatelimitError:
         raise self.retry(countdown=backoff(self) if backoff_var else countdown_wo())
 
-    redis_client.decrby(f"tornium:discord:ratelimit:global:{int(time.time()) % 3600}", 1)
-    bucket.call()
+    logger.warning(f"{method}|{endpoint.split('?')[0]} :: {bucket.remaining}")
+
+    try:
+        bucket.call()
+    except RatelimitError:
+        raise self.retry(countdown=backoff(self) if backoff_var else countdown_wo())
 
     return bucket
 
@@ -143,7 +133,7 @@ def tornget(
     return request
 
 
-@celery.shared_task(name="tasks.api.discordget", bind=True, max_retries=3, routing_key="api.discordget", queue="api")
+@celery.shared_task(name="tasks.api.discordget", bind=True, max_retries=5, routing_key="api.discordget", queue="api")
 def discordget(self: celery.Task, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {"Authorization": f'Bot {Config()["skynet-bottoken"]}'}
@@ -189,7 +179,7 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
 
 
 @celery.shared_task(
-    name="tasks.api.discordpatch", bind=True, max_retries=3, routing_key="api.discordpatch", queue="api"
+    name="tasks.api.discordpatch", bind=True, max_retries=5, routing_key="api.discordpatch", queue="api"
 )
 def discordpatch(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
@@ -243,7 +233,7 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
     return request_json
 
 
-@celery.shared_task(name="tasks.api.discordpost", bind=True, max_retries=3, routing_key="api.discordpost", queue="api")
+@celery.shared_task(name="tasks.api.discordpost", bind=True, max_retries=5, routing_key="api.discordpost", queue="api")
 def discordpost(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
@@ -296,7 +286,7 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
     return request_json
 
 
-@celery.shared_task(name="tasks.api.discordput", bind=True, max_retries=3, routing_key="api.discordput", queue="api")
+@celery.shared_task(name="tasks.api.discordput", bind=True, max_retries=5, routing_key="api.discordput", queue="api")
 def discordput(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
@@ -350,7 +340,7 @@ def discordput(self, endpoint, payload, *args, **kwargs):
 
 
 @celery.shared_task(
-    name="tasks.api.discorddelete", bind=True, max_retries=3, routing_key="api.discorddelete", queue="api"
+    name="tasks.api.discorddelete", bind=True, max_retries=5, routing_key="api.discorddelete", queue="api"
 )
 def discorddelete(self, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"

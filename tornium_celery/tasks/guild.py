@@ -212,7 +212,7 @@ def verify_users(
 
     try:
         guild_members: list = discordget(
-            f"guilds/{guild.sid}/members?limit={30 * len(admin_keys)}&after={highest_id}",
+            f"guilds/{guild.sid}/members?limit={25 * len(admin_keys)}&after={highest_id}",
         )
     except DiscordError as e:
         if log_channel > 0:
@@ -249,6 +249,7 @@ def verify_users(
 
     redis_client.incrby(f"tornium:verify:{guild_id}:member_count", len(guild_members))
     redis_client.incrby(f"tornium:verify:{guild.sid}:member_fetch_runs", 1)
+    counter = 0
 
     guild_member: dict
     for guild_member in guild_members:
@@ -256,6 +257,8 @@ def verify_users(
             continue
         elif guild_member["user"].get("bot") or guild_member["user"].get("system"):
             continue
+
+        counter += 1
 
         if int(guild_member["user"]["id"]) > highest_id:
             highest_id = int(guild_member["user"]["id"])
@@ -272,6 +275,7 @@ def verify_users(
                 queue="api",
             ).apply_async(
                 expires=300,
+                countdown=int(1 + 0.05 * counter),
                 link=verify_member_sub.signature(
                     kwargs={
                         "member": {
