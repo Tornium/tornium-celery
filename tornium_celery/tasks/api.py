@@ -40,7 +40,13 @@ logger = get_task_logger(__name__)
 
 
 def backoff(self: celery.Task):
+    if self.request.retries <= 1:
+        return countdown_wo()
     return int(1 + random.uniform(0, self.request.retries) ** self.request.retries)
+
+
+def countdown_wo():
+    return random.randint(1, 3)
 
 
 def discord_ratelimit_pre(
@@ -57,9 +63,9 @@ def discord_ratelimit_pre(
 
     try:
         if int(redis_client.get(f"tornium:discord:ratelimit:global:{int(time.time()) % 3600}")) < 1:
-            raise self.retry(countdown=backoff(self) if backoff_var else 1)
+            raise self.retry(countdown=backoff(self) if backoff_var else countdown_wo())
     except TypeError:
-        raise self.retry(countdown=backoff(self) if backoff_var else 1)
+        raise self.retry(countdown=backoff(self) if backoff_var else countdown_wo())
 
     bucket = DBucket.from_endpoint(method=method, endpoint=endpoint)
     bucket.refresh_bucket()
@@ -69,7 +75,7 @@ def discord_ratelimit_pre(
     try:
         bucket.verify()
     except RatelimitError:
-        raise self.retry(countdown=backoff(self) if backoff_var else 1)
+        raise self.retry(countdown=backoff(self) if backoff_var else countdown_wo())
 
     redis_client.decrby(f"tornium:discord:ratelimit:global:{int(time.time()) % 3600}", 1)
     bucket.call()
@@ -142,7 +148,7 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {"Authorization": f'Bot {Config()["skynet-bottoken"]}'}
 
-    bucket = discord_ratelimit_pre(self, "GET", endpoint, backoff_var=kwargs.get("backoff"))
+    bucket = discord_ratelimit_pre(self, "GET", endpoint, backoff_var=kwargs.get("backoff", True))
 
     request = requests.get(url, headers=headers)
 
@@ -192,7 +198,7 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
         "Content-Type": "application/json",
     }
 
-    bucket = discord_ratelimit_pre(self, "PATCH", endpoint, backoff_var=kwargs.get("backoff"))
+    bucket = discord_ratelimit_pre(self, "PATCH", endpoint, backoff_var=kwargs.get("backoff", True))
 
     if globals().get("orjson:loaded"):
         payload = orjson.dumps(payload)
@@ -245,7 +251,7 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
         "Content-Type": "application/json",
     }
 
-    bucket = discord_ratelimit_pre(self, "POST", endpoint, backoff_var=kwargs.get("backoff"))
+    bucket = discord_ratelimit_pre(self, "POST", endpoint, backoff_var=kwargs.get("backoff", True))
 
     if globals().get("orjson:loaded"):
         payload = orjson.dumps(payload)
@@ -298,7 +304,7 @@ def discordput(self, endpoint, payload, *args, **kwargs):
         "Content-Type": "application/json",
     }
 
-    bucket = discord_ratelimit_pre(self, "PUT", endpoint, backoff_var=kwargs.get("backoff"))
+    bucket = discord_ratelimit_pre(self, "PUT", endpoint, backoff_var=kwargs.get("backoff", True))
 
     if globals().get("orjson:loaded"):
         payload = orjson.dumps(payload)
@@ -353,7 +359,7 @@ def discorddelete(self, endpoint, *args, **kwargs):
         "Content-Type": "application/json",
     }
 
-    bucket = discord_ratelimit_pre(self, "GET", endpoint, backoff_var=kwargs.get("backoff"))
+    bucket = discord_ratelimit_pre(self, "GET", endpoint, backoff_var=kwargs.get("backoff", True))
 
     request = requests.delete(url, headers=headers)
 
