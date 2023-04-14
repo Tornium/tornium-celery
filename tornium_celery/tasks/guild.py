@@ -257,6 +257,8 @@ def verify_users(
             continue
         elif guild_member["user"].get("bot") or guild_member["user"].get("system"):
             continue
+        elif set(guild_member["roles"]) & set(map(str, guild.exclusion_roles)):  # Exclusion role in member's role
+            continue
 
         counter += 1
 
