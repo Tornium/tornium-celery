@@ -16,7 +16,6 @@
 import datetime
 import json
 import random
-import time
 import typing
 
 if globals().get("orjson:loaded"):
@@ -145,7 +144,9 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
     bucket.update_bucket(request.headers, "GET", endpoint)
 
     if request.status_code == 429:
-        raise RatelimitError
+        raise self.retry(
+            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(), exc=RatelimitError()
+        )
 
     try:
         if globals().get("orjson:loaded"):
@@ -200,7 +201,9 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
     bucket.update_bucket(request.headers, "PATCH", endpoint)
 
     if request.status_code == 429:
-        raise RatelimitError
+        raise self.retry(
+            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(), exc=RatelimitError()
+        )
 
     try:
         if globals().get("orjson:loaded"):
@@ -253,7 +256,9 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
     bucket.update_bucket(request.headers, "GET", endpoint)
 
     if request.status_code == 429:
-        raise RatelimitError
+        raise self.retry(
+            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(), exc=RatelimitError()
+        )
 
     try:
         if globals().get("orjson:loaded"):
@@ -306,7 +311,9 @@ def discordput(self, endpoint, payload, *args, **kwargs):
     bucket.update_bucket(request.headers, "GET", endpoint)
 
     if request.status_code == 429:
-        raise RatelimitError
+        raise self.retry(
+            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(), exc=RatelimitError()
+        )
 
     try:
         if globals().get("orjson:loaded"):
@@ -356,7 +363,9 @@ def discorddelete(self, endpoint, *args, **kwargs):
     bucket.update_bucket(request.headers, "GET", endpoint)
 
     if request.status_code == 429:
-        raise RatelimitError
+        raise self.retry(
+            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(), exc=RatelimitError()
+        )
 
     try:
         if globals().get("orjson:loaded"):
