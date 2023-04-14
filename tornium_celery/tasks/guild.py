@@ -212,7 +212,7 @@ def verify_users(
 
     try:
         guild_members: list = discordget(
-            f"guilds/{guild.sid}/members?limit={25 * len(admin_keys)}&after={highest_id}",
+            f"guilds/{guild.sid}/members?limit={10 * len(admin_keys)}&after={highest_id}",
         )
     except DiscordError as e:
         if log_channel > 0:
@@ -275,7 +275,7 @@ def verify_users(
                 queue="api",
             ).apply_async(
                 expires=300,
-                countdown=int(1 + 0.05 * counter),
+                countdown=int(1 + 0.1 * counter),
                 link=verify_member_sub.signature(
                     kwargs={
                         "member": {
@@ -307,6 +307,9 @@ def verify_users(
                     },
                     "new_data": False,
                 }
+            ).apply_async(
+                expires=300,
+                countdown=int(1 + 0.1 * counter),
             )
 
     # verify_users.signature(
