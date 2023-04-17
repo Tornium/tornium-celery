@@ -15,6 +15,7 @@
 
 import datetime
 import inspect
+import logging
 import math
 import random
 import time
@@ -31,7 +32,7 @@ from tornium_commons.skyutils import SKYNET_ERROR, SKYNET_INFO
 
 from .api import discordget, discordpatch, discordpost, tornget
 
-logger = get_task_logger(__name__)
+logger: logging.Logger = get_task_logger(__name__)
 
 
 @celery.shared_task(name="tasks.guild.refresh_guilds", routing_key="default.refresh_guilds", queue="default")
@@ -355,11 +356,9 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
             return
 
     if user.discord_id in (0, None, ""):
-        if log_channel == -1:
-            return
         return
 
-    patch_json = {}
+    patch_json: dict = {}
     guild: typing.Optional[ServerModel] = ServerModel.objects(sid=guild_id).first()
 
     if guild is None:
@@ -401,14 +400,13 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
 
             patch_json["roles"].append(str(faction_role))
 
-    if user.factionid != 0 and str(user.factionid) in guild.faction_verify:
-        for factiontid, verify_data in guild.faction_verify.items():
-            for faction_role in guild.faction_verify[str(user.factionid)]["roles"]:
-                if str(faction_role) in member["roles"] and int(factiontid) != user.factionid:
-                    if patch_json.get("roles") is None:
-                        patch_json["roles"] = member["roles"]
+    for factiontid, verify_data in guild.faction_verify.items():
+        for faction_role in verify_data["roles"]:
+            if str(faction_role) in member["roles"] and int(factiontid) != user.factionid:
+                if patch_json.get("roles") is None:
+                    patch_json["roles"] = member["roles"]
 
-                    patch_json["roles"].remove(str(faction_role))
+                patch_json["roles"].remove(str(faction_role))
 
     if (
         user.factionid != 0
@@ -452,6 +450,8 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
 
     if "roles" in patch_json:
         patch_json["roles"] = list(set(patch_json["roles"]))
+    if "nick" in patch_json:
+        logger.warning(f"{member['name']} changed to {patch_json['nick']}")  # prod test
     if len(patch_json) == 0:
         return
 
