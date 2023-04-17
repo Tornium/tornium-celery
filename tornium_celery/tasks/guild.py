@@ -15,6 +15,7 @@
 
 import datetime
 import inspect
+import math
 import random
 import time
 import typing
@@ -23,7 +24,7 @@ import celery
 import jinja2
 from celery.utils.log import get_task_logger
 from tornium_commons import rds
-from tornium_commons.errors import DiscordError, NetworkingError, TornError
+from tornium_commons.errors import DiscordError, NetworkingError
 from tornium_commons.formatters import torn_timestamp
 from tornium_commons.models import PositionModel, ServerModel, UserModel
 from tornium_commons.skyutils import SKYNET_ERROR, SKYNET_INFO
@@ -457,6 +458,7 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
     discordpatch.delay(
         endpoint=f"guilds/{guild_id}/members/{user.discord_id}",
         payload=patch_json,
+        countdown=math.floor(random.uniform(0, 30)),
     ).forget()
 
     if log_channel > 0:
@@ -484,4 +486,5 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
         discordpost.delay(
             endpoint=f"channels/{log_channel}/messages",
             payload=payload,
+            countdown=math.floor(random.uniform(0, 15)),
         ).forget()
