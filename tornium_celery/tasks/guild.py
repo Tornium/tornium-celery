@@ -374,7 +374,7 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
             .render(name=user.name, tid=user.tid, tag="")
         )
 
-        if "nick" != member["name"]:
+        if nick != member["name"]:
             patch_json["nick"] = nick
 
     if len(guild.verified_roles) != 0:
@@ -453,8 +453,7 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
 
     if "roles" in patch_json:
         patch_json["roles"] = list(set(patch_json["roles"]))
-    if "nick" in patch_json:
-        logger.warning(f"{member['name']} changed to {patch_json['nick']}")  # prod test
+
     if len(patch_json) == 0:
         return
 
