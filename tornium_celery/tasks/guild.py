@@ -151,17 +151,19 @@ def verify_users(
     elif guild.verify_template == "" and len(guild.verified_roles) == 0 and len(guild.faction_verify) == 0:
         return ValueError("Verification will result in no state change")
 
+    redis_client = rds()
+
+    if redis_client.exists(f"tornium:verify:{guild.sid}:lock") and highest_id == 0:
+        raise RuntimeError(f"Run in {redis_client.ttl(f'tornium:verify:{guild.sid}:lock')} seconds")
+
+    redis_client.set(f"tornium:verify:{guild.sid}:lock", 1, ex=600, nx=True)
+
     if admin_keys is None:
         admin_keys = tuple([admin.key for admin in guild.admins if admin is not None and admin.key not in ("", None)])
 
     server_data = discordget(
         f"guilds/{guild.sid}?with_counts=true",
     )
-
-    redis_client = rds()
-
-    # if redis_client.exists(f"tornium:verify:{guild.sid}:member_count") and highest_id == 0:
-    #     raise RuntimeError(f"Run in {redis_client.ttl(f'tornium:verify:{guild.sid}:member_count')} seconds")
 
     redis_client.set(f"tornium:verify:{guild.sid}:member_count", 0, ex=600, nx=True)
     redis_client.set(f"tornium:verify:{guild.sid}:member_fetch_runs", 0, ex=600, nx=True)
@@ -351,7 +353,7 @@ def verify_users(
             "log_channel": log_channel,
         }
     ).apply_async(
-        countdown=60,
+        countdown=30,
         expires=300,
     ).forget()
 
