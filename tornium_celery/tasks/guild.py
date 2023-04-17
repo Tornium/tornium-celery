@@ -269,6 +269,11 @@ def verify_users(
 
         user: typing.Optional[UserModel] = UserModel.objects(discord_id=guild_member["user"]["id"]).first()
 
+        if guild_member.get("nick") in (None, ""):
+            nick = guild_member["user"]["username"]
+        else:
+            nick = guild_member["nick"]
+
         if user is None or user.discord_id in ("", 0, None) or force:
             tornget.signature(
                 kwargs={
@@ -284,9 +289,7 @@ def verify_users(
                     kwargs={
                         "member": {
                             "id": int(guild_member["user"]["id"]),
-                            "name": guild_member["nick"]
-                            if "nick" in guild_member
-                            else guild_member["user"]["username"],
+                            "name": nick,
                             "icon": guild_member["user"].get("avatar"),
                             "roles": guild_member["roles"],
                         },
@@ -300,7 +303,7 @@ def verify_users(
                 kwargs={
                     "member": {
                         "id": guild_member["user"]["id"],
-                        "name": guild_member["nick"] if "nick" in guild_member else guild_member["user"]["username"],
+                        "name": nick,
                         "icon": guild_member["user"].get("avatar"),
                         "roles": guild_member["roles"],
                     },
