@@ -430,6 +430,9 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
     valid_position_roles = []
 
     for factiontid, faction_positions_data in guild.faction_verify.items():
+        if "positions" not in faction_positions_data:
+            continue
+
         for position_uuid, position_data in faction_positions_data["positions"].items():
             for position_role in position_data:
                 if position_role in valid_position_roles:
