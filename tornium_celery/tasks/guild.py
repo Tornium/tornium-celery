@@ -207,14 +207,37 @@ def verify_users(
         int(redis_client.get(f"tornium:verify:{guild.sid}:member_count"))
         > server_data["approximate_member_count"] * 0.99
         or int(redis_client.get(f"tornium:verify:{guild.sid}:member_fetch_runs"))
-        >= (server_data["approximate_member_count"] // ((30 * len(admin_keys)) + 1))
+        >= (server_data["approximate_member_count"] // ((15 * len(admin_keys)) + 1))
         or int(redis_client.get(f"tornium:verify:{guild.sid}:member_fetch_runs")) >= 50
     ):
+        if log_channel > 0:
+            discordpost.delay(
+                endpoint=f"channels/{log_channel}/messages",
+                payload={
+                    "embeds": [
+                        {
+                            "title": "Verification Finished",
+                            "description": inspect.cleandoc(
+                                f"""Verification of members of {guild.name} has finished <t:{int(time.time())}:R>.
+
+                                Estimated Members: {server_data['approximate_member_count']}
+                                Members Attempted: {redis_client.get(f'tornium:verify:{guild.sid}:member_count')}
+                                Loops Run: {redis_client.get(f'tornium:verify:{guild.sid}:member_fetch_runs')}
+                                """
+                            ),
+                            "color": SKYNET_INFO,
+                            "timestamp": datetime.datetime.utcnow().isoformat(),
+                            "footer": {"text": torn_timestamp()},
+                        }
+                    ]
+                },
+            ).forget()
+
         return
 
     try:
         guild_members: list = discordget(
-            f"guilds/{guild.sid}/members?limit={10 * len(admin_keys)}&after={highest_id}",
+            f"guilds/{guild.sid}/members?limit={15 * len(admin_keys)}&after={highest_id}",
         )
     except DiscordError as e:
         if log_channel > 0:
@@ -319,18 +342,18 @@ def verify_users(
                 countdown=int(1 + 0.1 * counter),
             )
 
-    # verify_users.signature(
-    #     kwargs={
-    #         "guild_id": guild_id,
-    #         "admin_keys": admin_keys,
-    #         "force": force,
-    #         "highest_id": highest_id,
-    #         "log_channel": log_channel,
-    #     }
-    # ).apply_async(
-    #     countdown=60,
-    #     expires=300,
-    # ).forget()
+    verify_users.signature(
+        kwargs={
+            "guild_id": guild_id,
+            "admin_keys": admin_keys,
+            "force": force,
+            "highest_id": highest_id,
+            "log_channel": log_channel,
+        }
+    ).apply_async(
+        countdown=60,
+        expires=300,
+    ).forget()
 
 
 @celery.shared_task(name="tasks.guild.verify_member_sub", routing_key="quick.verify_member_sub", queue="quick")
@@ -451,11 +474,10 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
 
                     patch_json["roles"].remove(str(position_role))
 
-    if "roles" in patch_json:
-        patch_json["roles"] = list(set(patch_json["roles"]))
-
     if len(patch_json) == 0:
         return
+    elif "roles" in patch_json:
+        patch_json["roles"] = list(set(patch_json["roles"]))
 
     discordpatch.delay(
         endpoint=f"guilds/{guild_id}/members/{user.discord_id}",
