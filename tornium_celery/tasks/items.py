@@ -30,8 +30,12 @@ from tornium_commons.skyutils import SKYNET_INFO
 from .api import tornget
 from .stakeout_hooks import send_notification
 
-if globals()["orjson:loaded"]:
+try:
     import orjson
+
+    globals()["orjson:loaded"] = True
+except ImportError:
+    globals()["orjson:loaded"] = False
 
 
 @celery.shared_task(name="tasks.items.update_items_pre", routing_key="quick.items.update_items_pre", queue="quick")
