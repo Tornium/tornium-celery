@@ -183,6 +183,16 @@ if celery_app is None:
                 "task": "tasks.stakeout_hooks.run_faction_stakeouts",
                 "enabled": False,
                 "schedule": {"type": "cron", "minute": "*", "hour": "*"},
+            },  # Item tasks
+            "update-items": {
+                "task": "tasks.items.update_items_pre",
+                "enabled": True,
+                "schedule": {"type": "cron", "minute": "0", "hour": "*/4"},
+            },
+            "fetch-market": {
+                "task": "tasks.items.fetch_market",
+                "enabled": True,
+                "schedule": {"type": "cron", "minute": "*", "hour": "*"},
             },
         }
 
@@ -319,6 +329,22 @@ if celery_app is None:
             "schedule": crontab(
                 minute=data["run-faction-stakeouts"]["schedule"]["minute"],
                 hour=data["run-faction-stakeouts"]["schedule"]["hour"],
+            ),
+        }
+    if "update-items" in data and data["update-items"]["enabled"]:
+        schedule["update-items"] = {
+            "task": data["update-items"]["task"],
+            "schedule": crontab(
+                minute=data["update-items"]["schedule"]["minute"],
+                hour=data["update-items"]["schedule"]["hour"],
+            ),
+        }
+    if "fetch-market" in data and data["fetch-market"]["enabled"]:
+        schedule["fetch-market"] = {
+            "task": data["fetch-market"]["task"],
+            "schedule": crontab(
+                minute=data["fetch-market"]["schedule"]["minute"],
+                hour=data["fetch-market"]["schedule"]["hour"],
             ),
         }
 
