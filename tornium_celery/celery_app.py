@@ -38,7 +38,7 @@ for module in ("ddtrace", "orjson"):
 if globals().get("ddtrace:loaded") and not hasattr(sys, "_called_from_test"):
     from ddtrace import patch_all
 
-    patch_all(logging=True)
+    patch_all(logging=True, pymongo=True, mongoengine=True)
 
 import json
 import typing
