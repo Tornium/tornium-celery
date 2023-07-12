@@ -85,7 +85,7 @@ def fetch_market():
     for item_id in unique_items:
         item_notifications = notifications.filter(target=item_id)
         recipient = item_notifications.first().recipient
-        recipient_user = UserModel.objects(tid=recipient).first()
+        recipient_user = UserModel.objects(discord_id=recipient).first()
 
         if recipient_user is None:
             continue
