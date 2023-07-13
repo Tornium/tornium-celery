@@ -241,7 +241,7 @@ def market_notifications(market_data: dict, notifications: dict):
                 fields.append(
                     {
                         "name": f"Bazaar #{i}",
-                        "value": f"{commas(listing['quantity'])} @ ${commas(listing['cost'])} → {commas(listing['quantity'] * listing['cost'])}",
+                        "value": f"{commas(listing['quantity'])} @ ${commas(listing['cost'])} → ${commas(listing['quantity'] * listing['cost'])}",
                         "inline": True,
                     }
                 )
@@ -282,7 +282,7 @@ def market_notifications(market_data: dict, notifications: dict):
                 fields.append(
                     {
                         "name": f"Bazaar #{i}",
-                        "value": f"{commas(listing['quantity'])} @ ${commas(listing['cost'])} → {commas(listing['quantity'] * listing['cost'])}",
+                        "value": f"{commas(listing['quantity'])} @ ${commas(listing['cost'])} → ${commas(listing['quantity'] * listing['cost'])}",
                         "inline": True,
                     }
                 )
