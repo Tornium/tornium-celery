@@ -24,7 +24,7 @@ from mongoengine import QuerySet
 from mongoengine.queryset.visitor import Q
 from tornium_commons import rds
 from tornium_commons.formatters import commas, torn_timestamp
-from tornium_commons.models import ItemModel, NotificationModel, UserModel
+from tornium_commons.models import ItemModel, NotificationModel, ServerModel, UserModel
 from tornium_commons.skyutils import SKYNET_INFO
 
 from .api import tornget
@@ -85,9 +85,19 @@ def fetch_market():
     for item_id in unique_items:
         item_notifications = notifications.filter(target=item_id)
         recipient = item_notifications.first().recipient
-        recipient_user = UserModel.objects(discord_id=recipient).first()
 
-        if recipient_user is None:
+        if item_notifications.first().recipient_type == 0:
+            key_user = UserModel.objects(discord_id=recipient).first().key
+        else:
+            guild: typing.Optional[ServerModel] = ServerModel.objects(sid=recipient).first()
+
+            if guild is None:
+                item_notifications.delete()
+                continue
+
+            key_user = UserModel.objects(tid=random.choice(guild.admins)).first()
+
+        if key_user is None:
             continue
 
         if globals()["orjson:loaded"]:
@@ -98,7 +108,7 @@ def fetch_market():
         tornget.signature(
             kwargs={
                 "endpoint": f"market/{item_id}?selections=itemmarket,bazaar",
-                "key": recipient_user.key,
+                "key": key_user.key,
             },
             queue="api",
         ).apply_async(
