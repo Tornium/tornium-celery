@@ -193,7 +193,7 @@ def market_notifications(market_data: dict, notifications: dict):
                 fields.append(
                     {
                         "name": f"Bazaar #{i}",
-                        "value": f"{commas(listing['quantity'])} @ ${commas(listing['cost'])} → {commas(listing['quantity'] * listing['cost'])} @ -{listing['percent_change']}%",
+                        "value": f"{commas(listing['quantity'])}x @ ${commas(listing['cost'])} → {commas(listing['quantity'] * listing['cost'])} @ -{listing['percent_change']}%",
                         "inline": True,
                     }
                 )
@@ -206,7 +206,7 @@ def market_notifications(market_data: dict, notifications: dict):
                     "embeds": [
                         {
                             "title": f"{item.name} Percent Change Notification",
-                            "description": f"{commas(total_quantity)} of {item.name} have been found in {i - 1} bazaars.",
+                            "description": f"{commas(total_quantity)}x of {item.name} have been found in {i - 1} bazaar(s) or market listing(s).",
                             "fields": fields,
                             "color": SKYNET_INFO,
                             "timestamp": datetime.datetime.utcnow().isoformat(),
@@ -252,7 +252,7 @@ def market_notifications(market_data: dict, notifications: dict):
                 fields.append(
                     {
                         "name": f"Bazaar #{i}",
-                        "value": f"{commas(listing['quantity'])} @ ${commas(listing['cost'])} → ${commas(listing['quantity'] * listing['cost'])}",
+                        "value": f"{commas(listing['quantity'])}x @ ${commas(listing['cost'])} → ${commas(listing['quantity'] * listing['cost'])}",
                         "inline": True,
                     }
                 )
@@ -265,7 +265,7 @@ def market_notifications(market_data: dict, notifications: dict):
                     "embeds": [
                         {
                             "title": f"{item.name} Price Notification",
-                            "description": f"{commas(total_quantity)} of {item.name} have been found in {i - 1} bazaars.",
+                            "description": f"{commas(total_quantity)}x of {item.name} have been found in {i - 1} bazaar(s) or market listing(s).",
                             "fields": fields,
                             "color": SKYNET_INFO,
                             "timestamp": datetime.datetime.utcnow().isoformat(),
@@ -293,7 +293,7 @@ def market_notifications(market_data: dict, notifications: dict):
                 fields.append(
                     {
                         "name": f"Bazaar #{i}",
-                        "value": f"{commas(listing['quantity'])} @ ${commas(listing['cost'])} → ${commas(listing['quantity'] * listing['cost'])}",
+                        "value": f"{commas(listing['quantity'])}x @ ${commas(listing['cost'])} → ${commas(listing['quantity'] * listing['cost'])}",
                         "inline": True,
                     }
                 )
@@ -305,7 +305,7 @@ def market_notifications(market_data: dict, notifications: dict):
                     "embeds": [
                         {
                             "title": f"{item.name} Quantity Notification",
-                            "description": f"{commas(total_quantity)} of {item.name} have been found in the first "
+                            "description": f"{commas(total_quantity)}x of {item.name} have been found in the first "
                             f"three visible bazaars.",
                             "fields": fields,
                             "color": SKYNET_INFO,
