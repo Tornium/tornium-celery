@@ -111,7 +111,7 @@ def fetch_market():
     name="tasks.items.market_notifications", routing_key="default.items.market_notifications", queue="default"
 )
 def market_notifications(market_data: dict, notifications: dict):
-    item: typing.Optional[ItemModel] = ItemModel.objects(tid=notifications[0]["target"])
+    item: typing.Optional[ItemModel] = ItemModel.objects(tid=notifications[0]["target"]).first()
 
     if item is None:
         raise ValueError("Unknown Item")
