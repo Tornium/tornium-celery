@@ -87,7 +87,7 @@ def fetch_market():
         recipient = item_notifications.first().recipient
 
         if item_notifications.first().recipient_type == 0:
-            key_user = UserModel.objects(discord_id=recipient).first().key
+            key_user = UserModel.objects(discord_id=recipient).first()
         else:
             guild: typing.Optional[ServerModel] = ServerModel.objects(sid=recipient).first()
 
