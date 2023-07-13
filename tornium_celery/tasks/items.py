@@ -214,7 +214,7 @@ def market_notifications(market_data: dict, notifications: dict):
                 continue
 
             for n in notifications:
-                if n["options"]["type"] != "percent" or n["value"] >= listing["cost"]:
+                if n["options"]["type"] != "price" or n["value"] >= listing["cost"]:
                     continue
 
                 if n["_id"]["$oid"] not in notifications:
