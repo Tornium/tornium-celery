@@ -97,7 +97,7 @@ def fetch_market():
 
         tornget.signature(
             kwargs={
-                "endpoint": f"market/{item_id}?selections=",
+                "endpoint": f"market/{item_id}?selections=itemmarket,bazaar",
                 "key": recipient_user.key,
             },
             queue="api",
