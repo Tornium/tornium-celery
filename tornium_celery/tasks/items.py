@@ -19,13 +19,12 @@ import random
 import typing
 
 import celery
-import pymongo
+import playhouse.postgres_ext
 from celery.utils.log import get_task_logger
-from mongoengine import QuerySet
-from mongoengine.queryset.visitor import Q
-from tornium_commons import rds
+from peewee import chunked, fn
+from tornium_commons import rds, requires_db_connection
 from tornium_commons.formatters import commas, torn_timestamp
-from tornium_commons.models import ItemModel, NotificationModel, ServerModel, UserModel
+from tornium_commons.models import Item, Notification, Server, User
 from tornium_commons.skyutils import SKYNET_INFO
 
 from .api import tornget
@@ -46,37 +45,41 @@ def update_items_pre():
     tornget.signature(
         kwargs={
             "endpoint": "torn/?selections=items",
-            "key": random.choice(UserModel.objects(key__nin=[None, ""])).key,
+            "key": User.select(User.key)
+            .where((User.key.is_null(False)) & (User.key != ""))
+            .order_by(fn.Random())
+            .get()
+            .key,
         },
         queue="api",
     ).apply_async(expires=300, link=update_items.s())
 
 
 @celery.shared_task(name="tasks.items.update_items", routing_key="quick.items.update_items", queue="quick")
-def update_items(items_data):
-    bulk_ops = []
+@requires_db_connection
+def update_items(items_data, database: playhouse.postgres_ext.PostgresqlExtDatabase):
+    # From tornium_commons.models.Item.update_items()
+    bulk_data = []
 
+    # TODO: Combine DB chunked insert and data compilation
     item_id: int
     item: dict
     for item_id, item in items_data["items"].items():
-        bulk_ops.append(
-            pymongo.UpdateOne(
-                {"tid": int(item_id)},
-                {
-                    "$set": {
-                        "tid": int(item_id),
-                        "name": item.get("name", ""),
-                        "description": item.get("description", ""),
-                        "type": item.get("type", ""),
-                        "market_value": item.get("market_value", 0),
-                        "circulation": item.get("circulation", 0),
-                    }
-                },
-                upsert=True,
-            )
+        bulk_data.append(
+            {
+                "tid": int(item_id),
+                "name": item.get("name", ""),
+                "description": item.get("description", ""),
+                "type": item.get("type", ""),
+                "market_value": item.get("market_value", 0),
+                "circulation": item.get("circulation", 0),
+            }
         )
 
-    ItemModel._get_collection().bulk_write(bulk_ops, ordered=False)
+    with database.atomic():
+        for batch in chunked(bulk_data, 100):
+            Item.replace_many(batch).execute()  # TODO: Might not work in PG (might be meant for sqlite)
+
     rds().set("tornium:items:last-update", int(datetime.datetime.utcnow().timestamp()), ex=5400)  # 1.5 hours
 
 
@@ -127,10 +130,9 @@ def fetch_market():
     name="tasks.items.market_notifications", routing_key="default.items.market_notifications", queue="default"
 )
 def market_notifications(market_data: dict, notifications: dict):
-    item: typing.Optional[ItemModel] = ItemModel.objects(tid=notifications[0]["target"]).first()
+    # TODO: Needs to be rewritten as relies on loading and dumping the model via JSON
 
-    if item is None:
-        raise ValueError("Unknown Item")
+    item: Item = Item.select().get_by_id(notifications[0]["target"])
 
     components = [
         {

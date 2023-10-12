@@ -33,7 +33,7 @@ from tornium_commons.errors import (
     TornError,
 )
 
-from .misc import remove_key_error, remove_unknown_channel
+from .misc import remove_key_error
 
 logger = get_task_logger("celery_app")
 
@@ -161,9 +161,6 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
 
         if request_json["code"] == 0:
             logger.info(request_json)
-        elif request_json["code"] == 10003:
-            if kwargs.get("channel") is not None:
-                remove_unknown_channel.delay(kwargs.get("channel")).forget()
 
         raise DiscordError(code=request_json["code"], message=request_json["message"])
     elif request.status_code // 100 != 2:
@@ -215,9 +212,6 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
 
         if request_json["code"] == 0:
             logger.info(request_json)
-        elif request_json["code"] == 10003:
-            if kwargs.get("channel") is not None:
-                remove_unknown_channel.delay(kwargs.get("channel")).forget()
 
         raise DiscordError(code=request_json["code"], message=request_json["message"])
     elif request.status_code // 100 != 2:
@@ -267,9 +261,6 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
 
         if request_json["code"] == 0:
             logger.info(request_json)
-        elif request_json["code"] == 10003:
-            if kwargs.get("channel") is not None:
-                remove_unknown_channel.delay(kwargs.get("channel")).forget()
 
         raise DiscordError(code=request_json["code"], message=request_json["message"])
     elif request.status_code // 100 != 2:
@@ -319,9 +310,6 @@ def discordput(self, endpoint, payload, *args, **kwargs):
 
         if request_json["code"] == 0:
             logger.info(request_json)
-        elif request_json["code"] == 10003:
-            if kwargs.get("channel") is not None:
-                remove_unknown_channel.delay(kwargs.get("channel")).forget()
 
         raise DiscordError(code=request_json["code"], message=request_json["message"])
     elif request.status_code // 100 != 2:
@@ -368,9 +356,6 @@ def discorddelete(self, endpoint, *args, **kwargs):
 
         if request_json["code"] == 0:
             logger.info(request_json)
-        elif request_json["code"] == 10003:
-            if kwargs.get("channel") is not None:
-                remove_unknown_channel.delay(kwargs.get("channel")).forget()
 
         raise DiscordError(code=request_json["code"], message=request_json["message"])
     elif request.status_code // 100 != 2:

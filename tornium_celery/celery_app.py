@@ -16,19 +16,7 @@
 import importlib.util
 import sys
 
-try:
-    from gevent import monkey
-
-    globals()["gevent:loaded"] = True
-except ImportError:
-    globals()["gevent:loaded"] = False
-
 for module in ("ddtrace", "orjson"):
-    if globals()["gevent:loaded"] and monkey.is_anything_patched():
-        globals()["ddtrace:loaded"] = False
-        globals()["orjson:loaded"] = False
-        break
-
     try:
         globals()[f"{module}:loaded"] = bool(importlib.util.find_spec(module))
     except (ValueError, ModuleNotFoundError):
@@ -51,19 +39,9 @@ from celery import Celery
 from celery.app import trace
 from celery.schedules import crontab
 from celery.signals import after_setup_logger
-from mongoengine import connect
 from tornium_commons import Config
 
-config = Config().load()
-
-if not hasattr(sys, "_called_from_test"):
-    connect(
-        db="Tornium",
-        username=config["username"],
-        password=config["password"],
-        host=f'mongodb://{config["host"]}',
-        connect=False,
-    )
+config = Config.from_json()
 
 _FORMAT = (
     "%(asctime)s %(levelname)s [%(name)s] [%(filename)s:%(lineno)d] "
