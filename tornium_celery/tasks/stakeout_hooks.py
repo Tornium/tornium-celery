@@ -22,8 +22,7 @@ import typing
 
 import celery
 from celery.utils.log import get_task_logger
-from mongoengine import QuerySet
-from mongoengine.queryset.visitor import Q
+from peewee import DoesNotExist
 from tornium_commons import rds
 from tornium_commons.errors import DiscordError, NetworkingError
 from tornium_commons.formatters import (
@@ -33,10 +32,10 @@ from tornium_commons.formatters import (
     torn_timestamp,
 )
 from tornium_commons.models import (
-    FactionModel,
-    NotificationModel,
-    ServerModel,
-    UserModel,
+    Faction,
+    Notification,
+    Server,
+    User,
 )
 from tornium_commons.skyutils import SKYNET_ERROR, SKYNET_GOOD, SKYNET_INFO
 
@@ -60,7 +59,7 @@ _TRAVEL_DESTINATIONS = {
 }
 
 
-def send_notification(notification: NotificationModel, payload: dict):
+def send_notification(notification: Notification, payload: dict):
     if not notification.options["enabled"]:
         return
 
@@ -77,7 +76,12 @@ def send_notification(notification: NotificationModel, payload: dict):
                 )
 
                 dm_channel = dm_channel["id"]
-                rds().set(f"tornium:discord:dm:{notification.recipient}", dm_channel, nx=True, ex=86400)
+                rds().set(
+                    f"tornium:discord:dm:{notification.recipient}",
+                    dm_channel,
+                    nx=True,
+                    ex=86400,
+                )
             except DiscordError:
                 return
             except NetworkingError:
@@ -88,7 +92,6 @@ def send_notification(notification: NotificationModel, payload: dict):
         discordpost.delay(
             endpoint=f"channels/{notification.recipient}/messages",
             payload=payload,
-            channel=notification.recipient,
         ).forget()
     else:
         return
@@ -111,30 +114,31 @@ def first_landing(duration):
 
 
 @celery.shared_task(
-    name="tasks.stakeout_hooks.run_user_stakeouts", routing_key="quick.stakeouts.run_user", queue="quick"
+    name="tasks.stakeout_hooks.run_user_stakeouts",
+    routing_key="quick.stakeouts.run_user",
+    queue="quick",
 )
 def run_user_stakeouts():
-    notifications: QuerySet = NotificationModel.objects(Q(ntype=1) & Q(options__enabled=True))
-
-    notification: NotificationModel
-    for notification in notifications:
-        invoker: UserModel = UserModel.objects(tid=notification.invoker).first()
+    notification: Notification
+    for notification in Notification.select().where((Notification.n_type == 1) & (Notification.enabled == True)):
+        invoker: typing.Optional[User] = User.objects(tid=notification.invoker).first()
 
         if invoker is None or invoker.key in ("", None):
-            if notification.recipient_type == 1:
-                guild: ServerModel = ServerModel.objects(sid=notification.recipient_guild).first()
-
-                if guild is None or len(guild.admins) == 0:
-                    continue
-
-                key_user: UserModel = UserModel.objects(tid=random.choice(guild.admins)).first()
-
-                if key_user is None:
-                    continue
-
-                key = key_user.key
-            else:
+            if notification.recipient_guild == 0:
                 continue
+
+            guild: typing.Optional[Server] = Server.select().where(Server.sid == notification.recipient_guild).first()
+
+            if guild is None or len(guild.admins) == 0:
+                notification.delete_instance()
+                continue
+
+            try:
+                key_user: typing.Optional[User] = User.select().where(User.tid == random.choice(guild.admins)).first()
+            except DoesNotExist:
+                continue
+
+            key = key_user.key
         else:
             key = invoker.key
 
@@ -150,17 +154,25 @@ def run_user_stakeouts():
         ).apply_async(expires=300, link=user_hook.s())
 
 
-@celery.shared_task(name="tasks.stakeout_hooks.user_hook", routing_key="quick.stakeouts.user_hook", queue="quick")
+@celery.shared_task(
+    name="tasks.stakeout_hooks.user_hook",
+    routing_key="quick.stakeouts.user_hook",
+    queue="quick",
+)
 def user_hook(user_data, faction: typing.Optional[int] = None):
     if "player_id" not in user_data:
         return
 
     if faction is None:
-        notifications: QuerySet = NotificationModel.objects(
-            Q(target=user_data["player_id"]) & Q(ntype=1) & Q(options__enabled=True)
+        notifications = Notification.select().where(
+            (Notification.target == user_data["player_id"])
+            & (Notification.n_type == 1)
+            & (Notification.enabled == True)
         )
     else:
-        notifications: QuerySet = NotificationModel.objects(Q(target=faction) & Q(ntype=2) & Q(options__enabled=True))
+        notifications = Notifications.select().where(
+            (Notification.target == faction) & (Notification.n_type == 2) & (Notification.enabled == True)
+        )
 
     if notifications.count() == 0:
         return
@@ -169,7 +181,7 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
     redis_client = rds()
 
     if "name" not in user_data:
-        user: UserModel = UserModel.objects(tid=user_data["player_id"]).first()
+        user: typing.Optional[User] = User.select(User.name).where(User.tid == user_data["player_id"]).first()
 
         if user is None:
             user_data["name"] = "Unknown"
@@ -184,7 +196,7 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
                         "title": f"{user_data['name']} Status Change",
                         "description": (
                             f"{user_data['name']} [{user_data['player_id']}] has now been inactive since "
-                            f"{rel_time(user_data['last_action']['timestamp'])}"
+                            f"<t:{user_data['last_action']['timestamp']}:R>"
                         ),
                         "color": SKYNET_INFO,
                         "timestamp": datetime.datetime.utcnow().isoformat(),
@@ -193,13 +205,13 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
                 ]
             }
 
-            notification: NotificationModel
+            notification: Notification
             for notification in notifications:
                 if faction is None and 1 not in notification.value:
                     continue
                 elif faction is not None and 3 not in notification.value:
                     continue
-                elif not notification.options["enabled"]:
+                elif not notification.enabled:
                     continue
 
                 send_notification(notification, payload)
@@ -220,13 +232,13 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
                 ]
             }
 
-            notification: NotificationModel
+            notification: Notification
             for notification in notifications:
                 if faction is None and 0 not in notification.value:
                     continue
                 elif faction is not None and 2 not in notification.value:
                     continue
-                elif not notification.options["enabled"]:
+                elif not notification.enabled:
                     continue
 
                 send_notification(notification, payload)
@@ -289,13 +301,13 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
                 ],
             }
 
-            notification: NotificationModel
+            notification: Notification
             for notification in notifications:
                 if faction is None and 2 not in notification.value:
                     continue
                 elif faction is not None and 4 not in notification.value:
                     continue
-                elif not notification.options["enabled"]:
+                elif not notification.enabled:
                     continue
 
                 send_notification(notification, payload)
@@ -319,13 +331,13 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
                 ]
             }
 
-            notification: NotificationModel
+            notification: Notification
             for notification in notifications:
                 if faction is None and 2 not in notification.value:
                     continue
                 elif faction is not None and 4 not in notification.value:
                     continue
-                elif not notification.options["enabled"]:
+                elif not notification.enabled:
                     continue
 
                 send_notification(notification, payload)
@@ -349,13 +361,13 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
             if redis_client.scard(f"tornium:stakeout-notif:user:{user_data['player_id']}:hospital") != 0:
                 redis_client.delete(f"tornium:stakeout-notif:user:{user_data['player_id']}:hospital")
 
-            notification: NotificationModel
+            notification: Notification
             for notification in notifications:
                 if faction is None and 3 not in notification.value:
                     continue
                 elif faction is not None and 1 not in notification.value:
                     continue
-                elif not notification.options["enabled"]:
+                elif not notification.enabled:
                     continue
 
                 send_notification(notification, payload)
@@ -428,59 +440,72 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
                 ],
             }
 
-            notification: NotificationModel
+            notification: Notification
             for notification in notifications:
                 if faction is None and 4 not in notification.value:
                     continue
                 elif faction is not None and 1 not in notification.value:
                     continue
-                elif not notification.options["enabled"]:
+                elif not notification.enabled:
                     continue
 
                 send_notification(notification, payload)
 
     if "last_action" in user_data:
-        redis_client.set(redis_key + ":last_action:status", user_data["last_action"]["status"], ex=300)
-        redis_client.set(redis_key + ":last_action:timestamp", user_data["last_action"]["timestamp"], ex=300)
+        redis_client.set(
+            redis_key + ":last_action:status",
+            user_data["last_action"]["status"],
+            ex=300,
+        )
+        redis_client.set(
+            redis_key + ":last_action:timestamp",
+            user_data["last_action"]["timestamp"],
+            ex=300,
+        )
 
     if "status" in user_data:
-        redis_client.set(redis_key + ":status:description", user_data["status"]["description"], ex=300)
+        redis_client.set(
+            redis_key + ":status:description",
+            user_data["status"]["description"],
+            ex=300,
+        )
         redis_client.set(redis_key + ":status:state", user_data["status"]["state"], ex=300)
         redis_client.set(redis_key + ":status:until", user_data["status"]["until"], ex=300)
 
 
 @celery.shared_task(
-    name="tasks.stakeout_hooks.run_faction_stakeouts", routing_key="quick.stakeouts.run_faction", queue="quick"
+    name="tasks.stakeout_hooks.run_faction_stakeouts",
+    routing_key="quick.stakeouts.run_faction",
+    queue="quick",
 )
 def run_faction_stakeouts():
-    target: int
-    for target in (
-        NotificationModel.objects(Q(ntype=2) & Q(options__enabled=True)).only("target").distinct(field="target")
+    notifictation: Notification
+    for notification in (
+        Notification.select()
+        .distinct(Notification.target)
+        .where((Notification.n_type == 2) & (Notification.enabled == True))
     ):
-        notification: NotificationModel = NotificationModel.objects(
-            Q(ntype=2) & Q(target=target) & Q(options__enabled=True)
-        ).first()
-
-        if notification is None:
-            continue
-
-        invoker: UserModel = UserModel.objects(tid=notification.invoker).first()
+        invoker: typing.Optional[User] = User.select().where(user.tid == notification.invoker).first()
 
         if invoker is None or invoker.key in ("", None):
-            if notification.recipient_type == 1:
-                guild: ServerModel = ServerModel.objects(sid=notification.recipient_guild).first()
-
-                if guild is None or len(guild.admins) == 0:
-                    continue
-
-                key_user: UserModel = UserModel.objects(tid=random.choice(guild.admins)).first()
-
-                if key_user is None:
-                    continue
-
-                key = key_user.key
-            else:
+            if notification.recipient_guild == 1:
                 continue
+
+            guild: typing.Optional[Server] = (
+                Server.select(Server.admins).where(Server.sid == notification.recipient_guild).first()
+            )
+
+            if guild is None or len(guild.admins) == 0:
+                continue
+
+            key_user: typing.Optional[User] = (
+                User.select(User.key).where(User.tid == random.choice(guild.admins)).first()
+            )
+
+            if key_user is None:
+                continue
+
+            key = key_user.key
         else:
             key = invoker.key
 
@@ -496,13 +521,17 @@ def run_faction_stakeouts():
         ).apply_async(expires=300, link=faction_hook.s())
 
 
-@celery.shared_task(name="tasks.stakeout_hooks.faction_hook", routing_key="quick.stakeouts.faction_hook", queue="quick")
+@celery.shared_task(
+    name="tasks.stakeout_hooks.faction_hook",
+    routing_key="quick.stakeouts.faction_hook",
+    queue="quick",
+)
 def faction_hook(faction_data):
     if "ID" not in faction_data:
         return
 
-    notifications: QuerySet = NotificationModel.objects(
-        Q(target=faction_data["ID"]) & Q(ntype=2) & Q(options__enabled=True)
+    notifications = Notification.select().where(
+        (Notification.target == faction_data["ID"]) & (Notification.n_type == 2) & (Notification.enabled == True)
     )
 
     if notifications.count() == 0:
@@ -515,7 +544,7 @@ def faction_hook(faction_data):
         for member_id in redis_client.smembers(f"{redis_key}:members"):
             if str(member_id) not in faction_data["members"].keys():
                 redis_client.srem(f"{redis_key}:members", member_id)
-                member: typing.Optional[UserModel] = UserModel.objects(tid=int(member_id)).first()
+                member: typing.Optional[User] = User.select().where(User.tid == int(member_id)).first()
 
                 payload = {
                     "embeds": [
@@ -540,11 +569,11 @@ def faction_hook(faction_data):
                         "description"
                     ] = f"{member.name} [{member_id}] has left {faction_data['name']} [{faction_data['ID']}]."
 
-                notification: NotificationModel
+                notification: Notification
                 for notification in notifications:
                     if 0 not in notification.value:
                         continue
-                    elif not notification.options["enabled"]:
+                    elif not notification.enabled:
                         continue
 
                     send_notification(notification, payload)
@@ -571,7 +600,7 @@ def faction_hook(faction_data):
                         ]
                     }
 
-                    notification: NotificationModel
+                    notification: Notification
                     for notification in notifications:
                         if 0 not in notification.value:
                             continue
@@ -593,7 +622,7 @@ def faction_hook(faction_data):
 
         faction_add = []
         faction_remove = []
-        valid_notifications: typing.Optional[list] = None
+        valid_notifications: typing.Optional[typing.List[Notification]] = None
 
         payload = {
             "embeds": [
@@ -634,7 +663,7 @@ def faction_hook(faction_data):
 
         for faction_tid in faction_peace_members - stored_peace_members:
             faction_add.append(faction_tid)
-            faction: typing.Optional[FactionModel] = FactionModel.objects(tid=faction_tid).only("name").first()
+            faction: typing.Optional[Faction] = Faction.select().where(Faction.tid == faction_tid).first()
 
             if faction is None:
                 payload["embeds"][0][
@@ -651,7 +680,6 @@ def faction_hook(faction_data):
 
             # TODO: Add function to generate list of notifications instead of in-line
             if valid_notifications is None:
-                notification: NotificationModel
                 for notification in notifications:
                     if 5 not in notification.value:
                         continue
@@ -663,7 +691,6 @@ def faction_hook(faction_data):
                     else:
                         valid_notifications.append(notification)
 
-            notification: NotificationModel
             for notification in valid_notifications:
                 send_notification(notification, payload)
 
@@ -672,7 +699,7 @@ def faction_hook(faction_data):
 
         for faction_tid in stored_peace_members - faction_peace_members:
             faction_remove.append(faction_tid)
-            faction: typing.Optional[FactionModel] = FactionModel.objects(tid=faction_tid).only("name").first()
+            faction: typing.Optional[Faction] = Faction.select().where(Faction.tid == faction_tid).first()
 
             if faction is None:
                 payload["embeds"][0][
@@ -688,11 +715,11 @@ def faction_hook(faction_data):
             ] = f"https://www.torn.com/factions.php?step=profile&ID={faction_tid}"
 
             if valid_notifications is None:
-                notification: NotificationModel
+                notification: Notification
                 for notification in notifications:
                     if 5 not in notification.value:
                         continue
-                    elif not notification.options["enabled"]:
+                    elif not notification.enabled:
                         continue
 
                     if valid_notifications is None:
@@ -700,7 +727,6 @@ def faction_hook(faction_data):
                     else:
                         valid_notifications.append(notification)
 
-            notification: NotificationModel
             for notification in valid_notifications:
                 send_notification(notification, payload)
 

@@ -27,7 +27,7 @@ if globals().get("ddtrace:loaded") and not hasattr(sys, "_called_from_test"):
     try:
         from ddtrace import patch_all
 
-        patch_all(logging=True, pymongo=True, mongoengine=True)
+        patch_all(logging=True)
     except ImportError:
         globals()["ddtrace:loaded"] = False
 

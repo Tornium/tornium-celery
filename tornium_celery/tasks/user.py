@@ -31,7 +31,12 @@ from .api import tornget
 logger = get_task_logger("celery_app")
 
 
-@celery.shared_task(name="tasks.user.update_user", routing_key="default.update_user", queue="default", bind=True)
+@celery.shared_task(
+    name="tasks.user.update_user",
+    routing_key="default.update_user",
+    queue="default",
+    bind=True,
+)
 def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, refresh_existing=True):
     # TODO: Change default values of tid and discordid to None
     # TODO: Refactor discordid -> discord_id
@@ -48,7 +53,7 @@ def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, r
     user: typing.Optional[User]
     if tid != 0:
         try:
-            user_exists = User.get_by_id(tid).exists()
+            user_exists = User.select(User.tid).where(User.tid == tid).exists()
         except DoesNotExist:
             user_exists = False
 
@@ -108,7 +113,11 @@ def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, r
     return result
 
 
-@celery.shared_task(name="tasks.user.update_user_self", routing_key="quick.update_user_self", queue="quick")
+@celery.shared_task(
+    name="tasks.user.update_user_self",
+    routing_key="quick.update_user_self",
+    queue="quick",
+)
 def update_user_self(user_data, key=None):
     user_data_kwargs = {"faction_aa": False}
 
@@ -133,7 +142,12 @@ def update_user_self(user_data, key=None):
         if user_data["faction"]["position"] in ("Leader", "Co-Leader"):
             user_data_kwargs["faction_position"] = None
             user_data_kwargs["faction_aa"] = True
-        elif user_data["faction"]["position"] not in ("None", "Recruit", "Leader", "Co-Leader"):
+        elif user_data["faction"]["position"] not in (
+            "None",
+            "Recruit",
+            "Leader",
+            "Co-Leader",
+        ):
             try:
                 faction_position: typing.Optional[FactionPosition] = FactionPosition.get(
                     (FactionPosition.name == user_data["faction"]["position"])
@@ -208,7 +222,11 @@ def update_user_self(user_data, key=None):
     ).save()
 
 
-@celery.shared_task(name="tasks.user.update_user_other", routing_key="quick.update_user_other", queue="quick")
+@celery.shared_task(
+    name="tasks.user.update_user_other",
+    routing_key="quick.update_user_other",
+    queue="quick",
+)
 def update_user_other(user_data):
     user_data_kwargs = {"faction_aa": False}
 
@@ -230,7 +248,12 @@ def update_user_other(user_data):
         if user_data["faction"]["position"] in ("Leader", "Co-Leader"):
             user_data_kwargs["faction_position"] = None
             user_data_kwargs["faction_aa"] = True
-        elif user_data["faction"]["position"] not in ("None", "Recruit", "Leader", "Co-Leader"):
+        elif user_data["faction"]["position"] not in (
+            "None",
+            "Recruit",
+            "Leader",
+            "Co-Leader",
+        ):
             try:
                 faction_position: typing.Optional[FactionPosition] = FactionPosition.get(
                     (FactionPosition.name == user_data["faction"]["position"])
@@ -249,7 +272,7 @@ def update_user_other(user_data):
         tid=user_data["player_id"],
         name=user_data["name"],
         level=user_data["level"],
-        discord_id=user_data["discord_id"] if user_data["discord"]["discordID"] != "" else 0,
+        discord_id=user_data["discord"]["discordID"] if user_data["discord"]["discordID"] != "" else 0,
         faction=faction,
         status=user_data["last_action"]["status"],
         last_action=datetime.datetime.fromtimestamp(user_data["last_action"]["timestamp"], tz=datetime.timezone.utc),
@@ -287,7 +310,7 @@ def update_user_other(user_data):
     PersonalStats(
         pstat_id=int(bin(user_data["player_id"] << 8), 2) + int(bin(now), 2),
         tid=user_data["player_id"],
-        timestamp=int(time.time()),
+        timestamp=datetime.datetime.utcnow(),
         ps_data=user_data["personalstats"],
     ).save()
 
@@ -301,7 +324,11 @@ def update_user_other(user_data):
         pass
 
 
-@celery.shared_task(name="tasks.user.refresh_users", routing_key="default.refresh_users", queue="default")
+@celery.shared_task(
+    name="tasks.user.refresh_users",
+    routing_key="default.refresh_users",
+    queue="default",
+)
 def refresh_users():
     user: User
     for user in User.select(User.key != ""):
@@ -318,7 +345,11 @@ def refresh_users():
         )
 
 
-@celery.shared_task(name="tasks.user.fetch_attacks_user_runner", routing_key="quick.fetch_user_attacks", queue="quick")
+@celery.shared_task(
+    name="tasks.user.fetch_attacks_user_runner",
+    routing_key="quick.fetch_user_attacks",
+    queue="quick",
+)
 def fetch_attacks_user_runner():
     redis = rds()
 
@@ -362,7 +393,11 @@ def fetch_attacks_user_runner():
         )
 
 
-@celery.shared_task(name="tasks.user.stat_db_attacks_user", routing_key="quick.stat_db_attacks_user", queue="quick")
+@celery.shared_task(
+    name="tasks.user.stat_db_attacks_user",
+    routing_key="quick.stat_db_attacks_user",
+    queue="quick",
+)
 def stat_db_attacks_user(user_data):
     if len(user_data.get("attacks", [])) == 0:
         return
@@ -376,7 +411,15 @@ def stat_db_attacks_user(user_data):
 
     attack: dict
     for attack in user_data["attacks"].values():
-        if attack["result"] in ["Assist", "Lost", "Stalemate", "Escape", "Looted", "Interrupted", "Timeout"]:
+        if attack["result"] in [
+            "Assist",
+            "Lost",
+            "Stalemate",
+            "Escape",
+            "Looted",
+            "Interrupted",
+            "Timeout",
+        ]:
             continue
         elif attack["defender_id"] in [
             4,

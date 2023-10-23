@@ -41,7 +41,11 @@ def send_dm(discord_id: int, payload: dict):
     return discordpost.delay(endpoint=f"channels/{channel_id}/messages", payload=payload)
 
 
-@celery.shared_task(name="tasks.misc.remove_key_error", routing_key="quick.remove_key_error", queue="quick")
+@celery.shared_task(
+    name="tasks.misc.remove_key_error",
+    routing_key="quick.remove_key_error",
+    queue="quick",
+)
 def remove_key_error(key: str, error: int):
     try:
         user: User = User.get(User.key == key)

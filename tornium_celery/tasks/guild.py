@@ -37,7 +37,11 @@ from .user import update_user
 logger: logging.Logger = get_task_logger("celery_app")
 
 
-@celery.shared_task(name="tasks.guild.refresh_guilds", routing_key="default.refresh_guilds", queue="default")
+@celery.shared_task(
+    name="tasks.guild.refresh_guilds",
+    routing_key="default.refresh_guilds",
+    queue="default",
+)
 def refresh_guilds():
     try:
         guilds = discordget("users/@me/guilds")
@@ -152,7 +156,11 @@ def refresh_guilds():
 
 @celery.shared_task(name="tasks.guild.verify_users", routing_key="default.verify_users", queue="default")
 def verify_users(
-    guild_id: int, admin_keys: typing.Optional[list] = None, force=False, highest_id: int = 0, log_channel: int = -2
+    guild_id: int,
+    admin_keys: typing.Optional[list] = None,
+    force=False,
+    highest_id: int = 0,
+    log_channel: int = -2,
 ):
     # Log channel
     # -2: temporarily disabled (to be verified)
@@ -397,7 +405,11 @@ def verify_users(
     ).forget()
 
 
-@celery.shared_task(name="tasks.guild.verify_member_sub", routing_key="quick.verify_member_sub", queue="quick")
+@celery.shared_task(
+    name="tasks.guild.verify_member_sub",
+    routing_key="quick.verify_member_sub",
+    queue="quick",
+)
 def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id: int):
     if "error" in user_data:
         return
@@ -423,7 +435,11 @@ def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id:
         nick = (
             jinja2.Environment(autoescape=True)
             .from_string(guild.verify_template)
-            .render(name=user.name, tid=user.tid, tag="" if user.faction is None else user.faction.tag)
+            .render(
+                name=user.name,
+                tid=user.tid,
+                tag="" if user.faction is None else user.faction.tag,
+            )
         )
 
         if nick != member["name"]:

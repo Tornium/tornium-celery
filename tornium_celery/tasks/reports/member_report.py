@@ -29,7 +29,11 @@ from ..api import tornget
 logger: logging.Logger = get_task_logger("celery_app")
 
 
-@celery.shared_task(name="tasks.reports.member_ps_error", routing_key="quick.reports.member_ps_error", queue="quick")
+@celery.shared_task(
+    name="tasks.reports.member_ps_error",
+    routing_key="quick.reports.member_ps_error",
+    queue="quick",
+)
 def member_ps_error(request, exc, traceback, rid: str):
     try:
         report: MemberReport = MemberReport.get_by_id(rid)
@@ -41,7 +45,9 @@ def member_ps_error(request, exc, traceback, rid: str):
 
 
 @celery.shared_task(
-    name="tasks.reports.member_ps_success", routing_key="quick.reports.member_ps_success", queue="quick"
+    name="tasks.reports.member_ps_success",
+    routing_key="quick.reports.member_ps_success",
+    queue="quick",
 )
 def member_ps_success(rid: str):
     try:
@@ -57,7 +63,9 @@ def member_ps_success(rid: str):
 
 
 @celery.shared_task(
-    name="tasks.reports.enqueue_member_ps", routing_key="default.reports.enqueue_member_ps", queue="default"
+    name="tasks.reports.enqueue_member_ps",
+    routing_key="default.reports.enqueue_member_ps",
+    queue="default",
 )
 def enqueue_member_ps(faction_data: dict, api_keys: tuple, rid: str):
     if len(api_keys) == 0:
@@ -74,7 +82,14 @@ def enqueue_member_ps(faction_data: dict, api_keys: tuple, rid: str):
             coleader=faction_data["co-leader"],
         ).on_conflict(
             conflict_target=[Faction.tid],
-            preserve=[Faction.name, Faction.tag, Faction.respect, Faction.capacity, Faction.leader, Faction.coleader],
+            preserve=[
+                Faction.name,
+                Faction.tag,
+                Faction.respect,
+                Faction.capacity,
+                Faction.leader,
+                Faction.coleader,
+            ],
         ).execute()
     except Exception as e:
         logger.exception(e)
@@ -170,7 +185,11 @@ def enqueue_member_ps(faction_data: dict, api_keys: tuple, rid: str):
     )
 
 
-@celery.shared_task(name="tasks.reports.store_member_ps", routing_key="quick.reports.store_member_ps", queue="quick")
+@celery.shared_task(
+    name="tasks.reports.store_member_ps",
+    routing_key="quick.reports.store_member_ps",
+    queue="quick",
+)
 def store_member_ps(member_data: dict, tid: int, rid: str, timestamp: int):
     # timestamp must be in UTC
 

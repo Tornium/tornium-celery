@@ -20,14 +20,11 @@ import typing
 
 import celery
 from celery.utils.log import get_task_logger
-from mongoengine import QuerySet
-from mongoengine.queryset.visitor import Q
-from pymongo.errors import BulkWriteError
 from redis.commands.json.path import Path
-from tornium_commons import rds
+from tornium_commons import rds, db
 from tornium_commons.errors import DiscordError, NetworkingError, TornError
 from tornium_commons.formatters import commas, torn_timestamp
-from tornium_commons.models import NotificationModel, ServerModel, TickModel, UserModel
+from tornium_commons.models import Notification, Server, StockTick, User
 from tornium_commons.skyutils import SKYNET_ERROR, SKYNET_GOOD, SKYNET_INFO
 
 from .api import discordpost, tornget
@@ -40,7 +37,9 @@ def _map_stock_image(acronym: str):
     return f"https://www.torn.com/images/v2/stock-market/portfolio/{acronym.upper()}.png"
 
 
-def _get_stocks_tick(stock_id: int, timestamp: typing.Optional[datetime.datetime] = None, **kwargs):
+def _get_stocks_tick(
+    stock_id: int, timestamp: typing.Optional[datetime.datetime] = None, **kwargs
+) -> typing.Optional[StockTick]:
     minutes_ago = kwargs.get("minutes", 0)
     hours_ago = kwargs.get("hours", 0)
     days_ago = kwargs.get("days", 0)
@@ -51,17 +50,21 @@ def _get_stocks_tick(stock_id: int, timestamp: typing.Optional[datetime.datetime
 
     timestamp = timestamp - datetime.timedelta(minutes=minutes_ago, hours=hours_ago, days=days_ago)
 
-    return TickModel.objects(tick_id=int(binary_stock_id, 2) + int(bin(int(timestamp.timestamp()) << 8), 2)).first()
+    return (
+        StockTick.select()
+        .where(StockTick.tick_id == int(binary_stock_id, 2) + int(bin(int(timestamp.timestamp()) << 8), 2))
+        .first()
+    )
 
 
 @celery.shared_task(name="tasks.stocks.stocks_prefetch", routing_key="quick.stocks_prefetch", queue="quick")
 def stocks_prefetch():
     stocks_timestamp = datetime.datetime.utcnow().replace(second=5, microsecond=0, tzinfo=datetime.timezone.utc)
-
+    # TODO: Don't use ETA if the current time is past xx:xx:05
     return tornget.signature(
         kwargs={
             "endpoint": "torn/?selections=stocks",
-            "key": random.choice(UserModel.objects(key__nin=[None, ""])).key,
+            "key": User.random_key(),
         },
         queue="api",
     ).apply_async(
@@ -86,40 +89,27 @@ def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datet
     if stocks_data is None:
         raise ValueError
 
-    tick_data = []
-    stocks_timestamp = int(stocks_timestamp.replace(second=0, tzinfo=datetime.timezone.utc).timestamp())
-    binary_timestamp = bin(stocks_timestamp << 8)
+    stocks_timestamp = stocks_timestamp.replace(second=0, tzinfo=datetime.timezone.utc)
+    binary_timestamp = bin(int(stocks_timestamp.timestamp()) << 8)
 
     stocks = {}
     stock_benefits = {}
 
-    for stock in stocks_data["stocks"].values():
-        binary_stockid = bin(stock["stock_id"])
+    with db().atomic():
+        cmd = """INSERT INTO stocktick (tick_id, timestmap, stock_id, price, cap, shares, investors)
+            VALUES
+        """
 
-        tick_data.append(
-            {
-                "tick_id": int(binary_stockid, 2) + int(binary_timestamp, 2),
-                "timestamp": stocks_timestamp,
-                "stock_id": stock["stock_id"],
-                "price": stock["current_price"],
-                "cap": stock["market_cap"],
-                "shares": stock["total_shares"],
-                "investors": stock["investors"],
-            }
-        )
+        for stock in stocks_data.values():
+            cmd += f"({int(bin(stock['stock_id']), 2) + int(binary_timestamp, 2)}, {stocks_timestamp}, {stock['stock_id']}, {stock['current_price']}, {stock['market_cap']}, {stock['total_shares']}, {stock['investors']}),\n"
 
-        stocks[stock["stock_id"]] = stock["acronym"]
-        stock_benefits[stock["stock_id"]] = stock["benefit"]
+            stocks[stock["stock_id"]] = stock["acronym"]
+            stock_benefits[stock["stock_id"]] = stock["benefit"]
+
+        cmd = cmd[:-2] + "\nON CONFLICT (tick_id) DO NOTHING"
 
     rds().json().set("tornium:stocks", Path.root_path(), stocks)
     rds().json().set("tornium:stocks:benefits", Path.root_path(), stock_benefits)
-
-    # Resolves duplicate keys: https://github.com/MongoEngine/mongoengine/issues/1465#issuecomment-445443894
-    try:
-        _tick_data = [TickModel(**tick).to_mongo() for tick in tick_data]
-        TickModel._get_collection().insert_many(_tick_data, ordered=False)
-    except BulkWriteError:
-        logger.warning("Stock tick data bulk insert failed. Duplicates may have been found and were skipped.")
 
     return stocks_data
 
@@ -127,15 +117,17 @@ def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datet
 @celery.shared_task(
     name="tasks.stocks.stock_price_notifications", routing_key="default.stock_price_notifications", queue="default"
 )
-def stock_price_notifications(stocks_data):
-    notification: NotificationModel
-    for notification in NotificationModel.objects(ntype=0):
+def stock_price_notifications(stocks_data: dict):
+    notification: Notification
+    for notification in Notification.select().where(Notification.n_type == 0):
         target_stock = stocks_data["stocks"][str(notification.target)]
 
-        stock_timestamp = notification.time_created // 60 * 60
-        stock_tick: TickModel = TickModel.objects(
-            tick_id=int(bin(target_stock["stock_id"]), 2) + int(bin(stock_timestamp << 8), 2)
-        ).first()
+        stock_timestamp = int(notification.time_created.timestamp() // 60 * 60)
+        stock_tick: typing.Optional[StockTick] = (
+            StockTick.select(StockTick.price)
+            .where(StockTick.tick_id == int(bin(target_stock["stock_id"]), 2) + int(bin(stock_timestamp << 8), 2))
+            .first()
+        )
 
         payload = {
             "embeds": [
@@ -186,19 +178,19 @@ def stock_price_notifications(stocks_data):
         if payload is None:
             continue
 
-        if notification.recipient_type == 0:
+        if notification.recipient_guild == 0:
             send_dm.delay(notification.recipient, payload=payload).forget()
-        elif notification.recipient_type == 1:
-            discordpost.delay(f"channels/{notification.recipient}/messages", payload=payload).forget()
         else:
-            continue
+            discordpost.delay(f"channels/{notification.recipient}/messages", payload=payload).forget()
 
         if not notification.persistent:
-            notification.delete()
+            notification.delete_instance()
 
 
 @celery.shared_task(name="tasks.stocks.stock_notifications", routing_key="default.stock_notifications", queue="default")
 def stock_notifications(stocks_data: dict, stocks_timestamp: datetime.datetime = datetime.datetime.utcnow()):
+    return  # TODO: Rewrite
+
     def base_embed(target_stock: dict) -> dict:
         return {
             "author": {
@@ -457,161 +449,3 @@ def stock_notifications(stocks_data: dict, stocks_timestamp: datetime.datetime =
 
             if month_max * 1.01 < stock["current_price"]:
                 pass
-
-
-@celery.shared_task(name="tasks.stocks.fetch_stock_ticks", routing_key="default.fetch_stock_ticks", queue="default")
-def fetch_stock_ticks():
-    return
-    time.sleep(5)  # Torn has stock tick data ready at xx:xx:05
-
-    auth_users = [user.key for user in UserModel.objects(key__nin=[None, ""])]
-    random.shuffle(auth_users)
-
-    stocks_data = None
-    torn_key = random.choice(auth_users)
-    timeout_retry = False
-
-    while stocks_data is None:
-        try:
-            stocks_data = tornget("torn/?selections=stocks", key=torn_key)
-        except TornError as e:
-            if e.code in (1, 2, 3, 4, 6, 7, 8, 9):
-                return
-
-            torn_key = random.choice(auth_users)
-        except NetworkingError as e:
-            if e.code == 408 and not timeout_retry:
-                timeout_retry = True
-                continue
-
-            torn_key = random.choice(auth_users)
-            timeout_retry = False
-
-    if stocks_data is None:
-        return
-
-    tick_data = []
-    now = datetime.datetime.utcnow()
-    now = int(
-        datetime.datetime(
-            year=now.year,
-            month=now.month,
-            day=now.day,
-            hour=now.hour,
-            minute=now.minute,
-            second=0,
-        )
-        .replace(tzinfo=datetime.timezone.utc)
-        .timestamp()
-    )
-    binary_timestamp = bin(now << 8)
-
-    stocks = {}
-
-    for stock in stocks_data["stocks"].values():
-        binary_stockid = bin(stock["stock_id"])
-
-        tick_data.append(
-            {
-                "tick_id": int(binary_stockid, 2) + int(binary_timestamp, 2),
-                "timestamp": now,
-                "stock_id": stock["stock_id"],
-                "price": stock["current_price"],
-                "cap": stock["market_cap"],
-                "shares": stock["total_shares"],
-                "investors": stock["investors"],
-            }
-        )
-
-        stocks[stock["stock_id"]] = stock["acronym"]
-
-    rds().json().set("tornium:stocks", Path.root_path(), stocks)
-
-    # Resolves duplicate keys: https://github.com/MongoEngine/mongoengine/issues/1465#issuecomment-445443894
-    try:
-        tick_data = [TickModel(**tick).to_mongo() for tick in tick_data]
-        TickModel._get_collection().insert_many(tick_data, ordered=False)
-    except BulkWriteError:
-        logger.warning("Stock tick data bulk insert failed. Duplicates may have been found and were skipped.")
-    except Exception as e:
-        logger.exception(e)
-
-    notification: NotificationModel
-    for notification in NotificationModel.objects(ntype=0):
-        target_stock = stocks_data["stocks"][str(notification.target)]
-
-        stock_timestamp = notification.time_created // 60 * 60
-        stock_tick: TickModel = TickModel.objects(
-            tick_id=int(bin(target_stock["stock_id"]), 2) + int(bin(stock_timestamp << 8), 2)
-        ).first()
-
-        payload = {
-            "embeds": [
-                {
-                    "author": {
-                        "name": target_stock["name"],
-                    },
-                    "image": {
-                        "url": _map_stock_image(target_stock["acronym"]),
-                    },
-                    "fields": [
-                        {
-                            "name": "Original Price",
-                            "value": f"${commas(stock_tick.price, stock_price=True)}"
-                            if stock_tick is not None
-                            else "Unknown",
-                            "inline": True,
-                        },
-                        {
-                            "name": "Target Price",
-                            "value": f"${commas(notification.value, stock_price=True)}",
-                            "inline": True,
-                        },
-                        {
-                            "name": "Current Price",
-                            "value": f"${commas(target_stock['current_price'], stock_price=True)}",
-                            "inline": True,
-                        },
-                    ],
-                    "footer": {"text": torn_timestamp()},
-                    "timestamp": datetime.datetime.utcnow().isoformat(),
-                }
-            ]
-        }
-
-        if notification.options.get("equality") == ">" and target_stock["current_price"] > notification.value:
-            payload["embeds"][0]["title"] = "Above Target Price"
-            payload["embeds"][0]["color"] = SKYNET_GOOD
-        elif notification.options.get("equality") == "<" and target_stock["current_price"] < notification.value:
-            payload["embeds"][0]["title"] = "Below Target Price"
-            payload["embeds"][0]["color"] = SKYNET_ERROR
-        elif notification.options.get("equality") == "=" and target_stock["current_price"] == notification.value:
-            payload["embeds"][0]["title"] = "Reached Target Price"
-            payload["embeds"][0]["color"] = SKYNET_GOOD
-        else:
-            continue
-
-        if payload is None:
-            continue
-
-        if notification.recipient_type == 0:
-            try:
-                dm_channel = discordpost(
-                    "users/@me/channels",
-                    payload={
-                        "recipient_id": notification.recipient,
-                    },
-                )
-            except DiscordError:
-                continue
-            except NetworkingError:
-                continue
-
-            discordpost.delay(f"channels/{dm_channel['id']}/messages", payload=payload).forget()
-        elif notification.recipient_type == 1:
-            discordpost.delay(f"channels/{notification.recipient}/messages", payload=payload).forget()
-        else:
-            continue
-
-        if not notification.persistent:
-            notification.delete()

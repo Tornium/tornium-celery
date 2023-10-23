@@ -40,7 +40,11 @@ except ImportError:
 logger = get_task_logger("celery_app")
 
 
-@celery.shared_task(name="tasks.items.update_items_pre", routing_key="quick.items.update_items_pre", queue="quick")
+@celery.shared_task(
+    name="tasks.items.update_items_pre",
+    routing_key="quick.items.update_items_pre",
+    queue="quick",
+)
 def update_items_pre():
     tornget.signature(
         kwargs={
@@ -55,7 +59,11 @@ def update_items_pre():
     ).apply_async(expires=300, link=update_items.s())
 
 
-@celery.shared_task(name="tasks.items.update_items", routing_key="quick.items.update_items", queue="quick")
+@celery.shared_task(
+    name="tasks.items.update_items",
+    routing_key="quick.items.update_items",
+    queue="quick",
+)
 @requires_db_connection
 def update_items(items_data, database: playhouse.postgres_ext.PostgresqlExtDatabase):
     # From tornium_commons.models.Item.update_items()
@@ -80,29 +88,37 @@ def update_items(items_data, database: playhouse.postgres_ext.PostgresqlExtDatab
         for batch in chunked(bulk_data, 100):
             Item.replace_many(batch).execute()  # TODO: Might not work in PG (might be meant for sqlite)
 
-    rds().set("tornium:items:last-update", int(datetime.datetime.utcnow().timestamp()), ex=5400)  # 1.5 hours
+    rds().set(
+        "tornium:items:last-update",
+        int(datetime.datetime.utcnow().timestamp()),
+        ex=5400,
+    )  # 1.5 hours
 
 
-@celery.shared_task(name="tasks.items.fetch_market", routing_key="default.items.fetch_market", queue="default")
+@celery.shared_task(
+    name="tasks.items.fetch_market",
+    routing_key="default.items.fetch_market",
+    queue="default",
+)
 def fetch_market():
-    notifications: QuerySet = NotificationModel.objects(Q(ntype=3) & Q(options__enabled=True))
-    unique_items = list(notifications.distinct("target"))
+    notifications = Notification.select().where((Notification.n_type == 3) & (Notification.enabled == True))
+    unique_items = list(notifications.distinct(Notification.target))
 
     for item_id in unique_items:
-        item_notifications = notifications.filter(target=item_id)
+        item_notifications = notifications.where(Notification.target == item_id)
 
         if item_notifications.first().recipient_type == 0:
             recipient = item_notifications.first().recipient
-            key_user = UserModel.objects(discord_id=recipient).first()
+            key_user: typing.Optional[User] = User.select().where(User.discord_id == recipient).first()
         else:
             recipient = item_notifications.first().recipient_guild
-            guild: typing.Optional[ServerModel] = ServerModel.objects(sid=recipient).first()
+            guild: typing.Optional[Server] = Server.select().where(Server.sid == recipient).first()
 
             if guild is None:
-                item_notifications.delete()
+                item_notifications.delete_instance()
                 continue
 
-            key_user = UserModel.objects(tid=random.choice(guild.admins)).first()
+            key_user: typing.Optional[User] = User.select().where(User.tid == random.choice(guild.admins)).first()
 
         if key_user is None:
             continue
@@ -127,10 +143,16 @@ def fetch_market():
 
 
 @celery.shared_task(
-    name="tasks.items.market_notifications", routing_key="default.items.market_notifications", queue="default"
+    name="tasks.items.market_notifications",
+    routing_key="default.items.market_notifications",
+    queue="default",
 )
 def market_notifications(market_data: dict, notifications: dict):
     # TODO: Needs to be rewritten as relies on loading and dumping the model via JSON
+    return
+
+    if len(notifications) == 0:
+        return
 
     item: Item = Item.select().get_by_id(notifications[0]["target"])
 
@@ -193,12 +215,11 @@ def market_notifications(market_data: dict, notifications: dict):
                     }
                 )
 
-        for n in notifications:
+        notif: dict
+        for notif in notifications:
             if n["_id"]["$oid"] not in notifications_map:
                 continue
 
-            notification_str = orjson.dumps(n) if globals()["orjson:loaded"] else json.dumps(n)
-            n_db = NotificationModel.from_json(notification_str)
             fields = []
             i = 1
             total_quantity = 0

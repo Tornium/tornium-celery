@@ -72,7 +72,11 @@ ATTACK_RESULTS = {
 }
 
 
-@celery.shared_task(name="tasks.faction.refresh_factions", routing_key="default.refresh_factions", queue="default")
+@celery.shared_task(
+    name="tasks.faction.refresh_factions",
+    routing_key="default.refresh_factions",
+    queue="default",
+)
 def refresh_factions():
     faction: Faction
     for faction in Faction.select().join(Server):
@@ -145,7 +149,11 @@ def refresh_factions():
                 continue
 
 
-@celery.shared_task(name="tasks.faction.update_faction", routing_key="quick.update_faction", queue="quick")
+@celery.shared_task(
+    name="tasks.faction.update_faction",
+    routing_key="quick.update_faction",
+    queue="quick",
+)
 def update_faction(faction_data):
     if faction_data is None:
         return
@@ -342,7 +350,11 @@ def update_faction(faction_data):
         user.save()
 
 
-@celery.shared_task(name="tasks.faction.update_faction_ts", routing_key="default.update_faction_ts", queue="default")
+@celery.shared_task(
+    name="tasks.faction.update_faction_ts",
+    routing_key="default.update_faction_ts",
+    queue="default",
+)
 def update_faction_ts(faction_ts_data):
     if not faction_ts_data["status"]:
         return
@@ -389,7 +401,11 @@ def update_faction_ts(faction_ts_data):
         user.save()
 
 
-@celery.shared_task(name="tasks.faction.check_faction_ods", routing_key="quick.check_faction_ods", queue="quick")
+@celery.shared_task(
+    name="tasks.faction.check_faction_ods",
+    routing_key="quick.check_faction_ods",
+    queue="quick",
+)
 def check_faction_ods(faction_od_data):
     try:
         faction: Faction = Faction.select().join(Server).get_by_id(faction_od_data["ID"])
@@ -480,7 +496,11 @@ def check_faction_ods(faction_od_data):
     faction.save()
 
 
-@celery.shared_task(name="tasks.faction.fetch_attacks_runner", routing_key="quick.fetch_attacks_runner", queue="quick")
+@celery.shared_task(
+    name="tasks.faction.fetch_attacks_runner",
+    routing_key="quick.fetch_attacks_runner",
+    queue="quick",
+)
 def fetch_attacks_runner():
     redis = rds()
 
@@ -560,7 +580,12 @@ def retal_attacks(faction_data, last_attacks=None):
         return
 
     try:
-        if faction.guild.retal_config[str(faction.tid)]["channel"] in ("0", 0, None, ""):
+        if faction.guild.retal_config[str(faction.tid)]["channel"] in (
+            "0",
+            0,
+            None,
+            "",
+        ):
             return
     except KeyError:
         return
@@ -569,7 +594,15 @@ def retal_attacks(faction_data, last_attacks=None):
         last_attacks = faction.last_attacks.timestamp()
 
     for attack in faction_data["attacks"].values():
-        if attack["result"] in ["Assist", "Lost", "Stalemate", "Escape", "Looted", "Interrupted", "Timeout"]:
+        if attack["result"] in [
+            "Assist",
+            "Lost",
+            "Stalemate",
+            "Escape",
+            "Looted",
+            "Interrupted",
+            "Timeout",
+        ]:
             continue
         elif attack["defender_id"] in [
             4,
@@ -598,11 +631,19 @@ def retal_attacks(faction_data, last_attacks=None):
         opponent: typing.Optional[User] = User.select().get_or_none(User.tid == attack["attacker_id"])
 
         if user is None:
-            user = User(tid=attack["defender_id"], name=attack["defender_name"], faction=attack["defender_faction"])
+            user = User(
+                tid=attack["defender_id"],
+                name=attack["defender_name"],
+                faction=attack["defender_faction"],
+            )
             user.save()
 
         if opponent is None:
-            opponent = User(tid=attack["attacker_id"], name=attack["attacker_name"], faction=attack["attacker_faction"])
+            opponent = User(
+                tid=attack["attacker_id"],
+                name=attack["attacker_name"],
+                faction=attack["attacker_faction"],
+            )
             opponent.save()
 
         if attack["attacker_faction"] == 0:
@@ -762,7 +803,11 @@ def retal_attacks(faction_data, last_attacks=None):
             continue
 
 
-@celery.shared_task(name="tasks.faction.stat_db_attacks", routing_key="quick.stat_db_attacks", queue="quick")
+@celery.shared_task(
+    name="tasks.faction.stat_db_attacks",
+    routing_key="quick.stat_db_attacks",
+    queue="quick",
+)
 def stat_db_attacks(faction_data, last_attacks=None):
     if "attacks" not in faction_data:
         return
@@ -782,7 +827,15 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
     attack: dict
     for attack in faction_data["attacks"].values():
-        if attack["result"] in ["Assist", "Lost", "Stalemate", "Escape", "Looted", "Interrupted", "Timeout"]:
+        if attack["result"] in [
+            "Assist",
+            "Lost",
+            "Stalemate",
+            "Escape",
+            "Looted",
+            "Interrupted",
+            "Timeout",
+        ]:
             continue
         elif attack["defender_id"] in [
             4,
@@ -823,7 +876,9 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
             if opponent is None:
                 opponent = User(
-                    tid=attack["attacker_id"], name=attack["attacker_name"], faction=attack["attacker_faction"]
+                    tid=attack["attacker_id"],
+                    name=attack["attacker_name"],
+                    faction=attack["attacker_faction"],
                 )
                 opponent.save()
         else:  # User is the attacker
@@ -842,7 +897,9 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
             if opponent is None:
                 opponent = User(
-                    tid=attack["defender_id"], name=attack["defender_name"], faction=attack["defender_faction"]
+                    tid=attack["defender_id"],
+                    name=attack["defender_name"],
+                    faction=attack["defender_faction"],
                 )
                 opponent.save()
 
@@ -880,7 +937,8 @@ def stat_db_attacks(faction_data, last_attacks=None):
             continue
 
     faction.last_attacks = datetime.datetime.fromtimestamp(
-        list(faction_data["attacks"].values())[-1]["timestamp_ended"], tz=datetime.timezone.utc
+        list(faction_data["attacks"].values())[-1]["timestamp_ended"],
+        tz=datetime.timezone.utc,
     )
     faction.save()
 
@@ -912,7 +970,11 @@ def oc_refresh():
         )
 
 
-@celery.shared_task(name="tasks.faction.oc_refresh_subtask", routing_key="default.oc_refresh_subtask", queue="default")
+@celery.shared_task(
+    name="tasks.faction.oc_refresh_subtask",
+    routing_key="default.oc_refresh_subtask",
+    queue="default",
+)
 def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
     try:
         faction: Faction = Faction.select().join(Server).where(Faction.tid == oc_data["ID"]).get()
@@ -1170,7 +1232,9 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
 
 
 @celery.shared_task(
-    name="tasks.faction.auto_cancel_requests", routing_key="default.auto_cancel_requests", queue="default"
+    name="tasks.faction.auto_cancel_requests",
+    routing_key="default.auto_cancel_requests",
+    queue="default",
 )
 def auto_cancel_requests():
     withdrawal: Withdrawal
@@ -1326,7 +1390,11 @@ def armory_check():
         )
 
 
-@celery.shared_task(name="tasks.faction.armory_check_subtask", routing_key="quick.armory_check_subtask", queue="quick")
+@celery.shared_task(
+    name="tasks.faction.armory_check_subtask",
+    routing_key="quick.armory_check_subtask",
+    queue="quick",
+)
 def armory_check_subtask(_armory_data, faction_id: int):
     try:
         faction: Faction = Faction.select().where(Faction.tid == faction_id).get()

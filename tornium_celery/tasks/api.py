@@ -128,7 +128,13 @@ def tornget(
     return request
 
 
-@celery.shared_task(name="tasks.api.discordget", bind=True, max_retries=5, routing_key="api.discordget", queue="api")
+@celery.shared_task(
+    name="tasks.api.discordget",
+    bind=True,
+    max_retries=5,
+    routing_key="api.discordget",
+    queue="api",
+)
 def discordget(self: celery.Task, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {"Authorization": f'Bot {Config()["skynet-bottoken"]}'}
@@ -141,7 +147,8 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
 
     if request.status_code == 429:
         raise self.retry(
-            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(), exc=RatelimitError()
+            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(),
+            exc=RatelimitError(),
         )
 
     try:
@@ -170,7 +177,11 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
 
 
 @celery.shared_task(
-    name="tasks.api.discordpatch", bind=True, max_retries=5, routing_key="api.discordpatch", queue="api"
+    name="tasks.api.discordpatch",
+    bind=True,
+    max_retries=5,
+    routing_key="api.discordpatch",
+    queue="api",
 )
 def discordpatch(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
@@ -192,105 +203,8 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
 
     if request.status_code == 429:
         raise self.retry(
-            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(), exc=RatelimitError()
-        )
-
-    try:
-        if globals().get("orjson:loaded"):
-            request_json = orjson.loads(request.content)
-        else:
-            request_json = request.json()
-    except Exception as e:
-        if request.status_code // 100 != 2:
-            raise NetworkingError(code=request.status_code, url=url)
-        else:
-            raise e
-
-    if "code" in request_json:
-        # See https://discord.com/developers/docs/topics/opcodes-and-status-codes#json for a full list of error codes
-        # explanations
-
-        if request_json["code"] == 0:
-            logger.info(request_json)
-
-        raise DiscordError(code=request_json["code"], message=request_json["message"])
-    elif request.status_code // 100 != 2:
-        raise NetworkingError(code=request.status_code, url=url)
-
-    return request_json
-
-
-@celery.shared_task(name="tasks.api.discordpost", bind=True, max_retries=5, routing_key="api.discordpost", queue="api")
-def discordpost(self, endpoint, payload, *args, **kwargs):
-    url = f"https://discord.com/api/v10/{endpoint}"
-    headers = {
-        "Authorization": f'Bot {Config()["skynet-bottoken"]}',
-        "Content-Type": "application/json",
-    }
-
-    bucket = discord_ratelimit_pre(self, "POST", endpoint, backoff_var=kwargs.get("backoff", True))
-
-    if globals().get("orjson:loaded"):
-        payload = orjson.dumps(payload)
-    else:
-        payload = json.dumps(payload)
-
-    request = requests.post(url, headers=headers, data=payload)
-
-    bucket.update_bucket(request.headers, "POST", endpoint)
-
-    if request.status_code == 429:
-        raise self.retry(
-            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(), exc=RatelimitError()
-        )
-
-    try:
-        if globals().get("orjson:loaded"):
-            request_json = orjson.loads(request.content)
-        else:
-            request_json = request.json()
-    except Exception as e:
-        if request.status_code // 100 != 2:
-            raise NetworkingError(code=request.status_code, url=url)
-        else:
-            raise e
-
-    if "code" in request_json:
-        # See https://discord.com/developers/docs/topics/opcodes-and-status-codes#json for a full list of error codes
-        # explanations
-
-        if request_json["code"] == 0:
-            logger.info(request_json)
-
-        raise DiscordError(code=request_json["code"], message=request_json["message"])
-    elif request.status_code // 100 != 2:
-        raise NetworkingError(code=request.status_code, url=url)
-
-    return request_json
-
-
-@celery.shared_task(name="tasks.api.discordput", bind=True, max_retries=5, routing_key="api.discordput", queue="api")
-def discordput(self, endpoint, payload, *args, **kwargs):
-    url = f"https://discord.com/api/v10/{endpoint}"
-    headers = {
-        "Authorization": f'Bot {Config()["skynet-bottoken"]}',
-        "Content-Type": "application/json",
-    }
-
-    bucket = discord_ratelimit_pre(self, "PUT", endpoint, backoff_var=kwargs.get("backoff", True))
-
-    if globals().get("orjson:loaded"):
-        payload = orjson.dumps(payload)
-    else:
-        payload = json.dumps(payload)
-
-    request = requests.put(url, headers=headers, data=payload)
-
-    bucket.update_bucket(request.headers, "PUT", endpoint)
-
-    if request.status_code == 429:
-        raise self.retry(
-            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(), exc=RatelimitError()
+            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(),
+            exc=RatelimitError(),
         )
 
     try:
@@ -319,24 +233,34 @@ def discordput(self, endpoint, payload, *args, **kwargs):
 
 
 @celery.shared_task(
-    name="tasks.api.discorddelete", bind=True, max_retries=5, routing_key="api.discorddelete", queue="api"
+    name="tasks.api.discordpost",
+    bind=True,
+    max_retries=5,
+    routing_key="api.discordpost",
+    queue="api",
 )
-def discorddelete(self, endpoint, *args, **kwargs):
+def discordpost(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
         "Authorization": f'Bot {Config()["skynet-bottoken"]}',
         "Content-Type": "application/json",
     }
 
-    bucket = discord_ratelimit_pre(self, "GET", endpoint, backoff_var=kwargs.get("backoff", True))
+    bucket = discord_ratelimit_pre(self, "POST", endpoint, backoff_var=kwargs.get("backoff", True))
 
-    request = requests.delete(url, headers=headers)
+    if globals().get("orjson:loaded"):
+        payload = orjson.dumps(payload)
+    else:
+        payload = json.dumps(payload)
 
-    bucket.update_bucket(request.headers, "DELETE", endpoint)
+    request = requests.post(url, headers=headers, data=payload)
+
+    bucket.update_bucket(request.headers, "POST", endpoint)
 
     if request.status_code == 429:
         raise self.retry(
-            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(), exc=RatelimitError()
+            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(),
+            exc=RatelimitError(),
         )
 
     try:
@@ -364,7 +288,119 @@ def discorddelete(self, endpoint, *args, **kwargs):
     return request_json
 
 
-@celery.shared_task(name="tasks.api.torn_stats_get", time_limit=15, routing_key="api.torn_stats_get", queue="api")
+@celery.shared_task(
+    name="tasks.api.discordput",
+    bind=True,
+    max_retries=5,
+    routing_key="api.discordput",
+    queue="api",
+)
+def discordput(self, endpoint, payload, *args, **kwargs):
+    url = f"https://discord.com/api/v10/{endpoint}"
+    headers = {
+        "Authorization": f'Bot {Config()["skynet-bottoken"]}',
+        "Content-Type": "application/json",
+    }
+
+    bucket = discord_ratelimit_pre(self, "PUT", endpoint, backoff_var=kwargs.get("backoff", True))
+
+    if globals().get("orjson:loaded"):
+        payload = orjson.dumps(payload)
+    else:
+        payload = json.dumps(payload)
+
+    request = requests.put(url, headers=headers, data=payload)
+
+    bucket.update_bucket(request.headers, "PUT", endpoint)
+
+    if request.status_code == 429:
+        raise self.retry(
+            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(),
+            exc=RatelimitError(),
+        )
+
+    try:
+        if globals().get("orjson:loaded"):
+            request_json = orjson.loads(request.content)
+        else:
+            request_json = request.json()
+    except Exception as e:
+        if request.status_code // 100 != 2:
+            raise NetworkingError(code=request.status_code, url=url)
+        else:
+            raise e
+
+    if "code" in request_json:
+        # See https://discord.com/developers/docs/topics/opcodes-and-status-codes#json for a full list of error codes
+        # explanations
+
+        if request_json["code"] == 0:
+            logger.info(request_json)
+
+        raise DiscordError(code=request_json["code"], message=request_json["message"])
+    elif request.status_code // 100 != 2:
+        raise NetworkingError(code=request.status_code, url=url)
+
+    return request_json
+
+
+@celery.shared_task(
+    name="tasks.api.discorddelete",
+    bind=True,
+    max_retries=5,
+    routing_key="api.discorddelete",
+    queue="api",
+)
+def discorddelete(self, endpoint, *args, **kwargs):
+    url = f"https://discord.com/api/v10/{endpoint}"
+    headers = {
+        "Authorization": f'Bot {Config()["skynet-bottoken"]}',
+        "Content-Type": "application/json",
+    }
+
+    bucket = discord_ratelimit_pre(self, "GET", endpoint, backoff_var=kwargs.get("backoff", True))
+
+    request = requests.delete(url, headers=headers)
+
+    bucket.update_bucket(request.headers, "DELETE", endpoint)
+
+    if request.status_code == 429:
+        raise self.retry(
+            countdown=backoff(self) if kwargs.get("backoff", True) else countdown_wo(),
+            exc=RatelimitError(),
+        )
+
+    try:
+        if globals().get("orjson:loaded"):
+            request_json = orjson.loads(request.content)
+        else:
+            request_json = request.json()
+    except Exception as e:
+        if request.status_code // 100 != 2:
+            raise NetworkingError(code=request.status_code, url=url)
+        else:
+            raise e
+
+    if "code" in request_json:
+        # See https://discord.com/developers/docs/topics/opcodes-and-status-codes#json for a full list of error codes
+        # explanations
+
+        if request_json["code"] == 0:
+            logger.info(request_json)
+
+        raise DiscordError(code=request_json["code"], message=request_json["message"])
+    elif request.status_code // 100 != 2:
+        raise NetworkingError(code=request.status_code, url=url)
+
+    return request_json
+
+
+@celery.shared_task(
+    name="tasks.api.torn_stats_get",
+    time_limit=15,
+    routing_key="api.torn_stats_get",
+    queue="api",
+)
 def torn_stats_get(endpoint, key, session=None):
     url = f"https://www.tornstats.com/api/v2/{key}/{endpoint}"
     redis_key = f"tornium:ts-ratelimit:{key}"
