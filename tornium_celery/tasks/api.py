@@ -99,7 +99,8 @@ def tornget(
         if int(redis_client.get(redis_key)) > 0:
             redis_client.decrby(redis_key, 1)
         else:
-            redis_client.set(redis_key, 1, ex=60 - datetime.datetime.utcnow().second)
+            # redis_client.set(redis_key, 1, ex=60 - datetime.datetime.utcnow().second)
+            raise RatelimitError
     except TypeError:
         redis_client.set(redis_key, 50, nx=True, ex=60 - datetime.datetime.utcnow().second)
 
@@ -137,7 +138,7 @@ def tornget(
 )
 def discordget(self: celery.Task, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
-    headers = {"Authorization": f'Bot {Config()["skynet-bottoken"]}'}
+    headers = {"Authorization": f'Bot {Config.from_cache()["skynet-bottoken"]}'}
 
     bucket = discord_ratelimit_pre(self, "GET", endpoint, backoff_var=kwargs.get("backoff", True))
 
@@ -186,7 +187,7 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
 def discordpatch(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
-        "Authorization": f'Bot {Config()["skynet-bottoken"]}',
+        "Authorization": f'Bot {Config.from_cache()["skynet-bottoken"]}',
         "Content-Type": "application/json",
     }
 
@@ -242,7 +243,7 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
 def discordpost(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
-        "Authorization": f'Bot {Config()["skynet-bottoken"]}',
+        "Authorization": f'Bot {Config.from_cache()["skynet-bottoken"]}',
         "Content-Type": "application/json",
     }
 
@@ -298,7 +299,7 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
 def discordput(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
-        "Authorization": f'Bot {Config()["skynet-bottoken"]}',
+        "Authorization": f'Bot {Config.from_cache()["skynet-bottoken"]}',
         "Content-Type": "application/json",
     }
 
@@ -354,7 +355,7 @@ def discordput(self, endpoint, payload, *args, **kwargs):
 def discorddelete(self, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
-        "Authorization": f'Bot {Config()["skynet-bottoken"]}',
+        "Authorization": f'Bot {Config.from_cache()["skynet-bottoken"]}',
         "Content-Type": "application/json",
     }
 

@@ -519,25 +519,26 @@ def fetch_attacks_runner():
         redis.expire("tornium:celery-lock:fetch-attacks", 1)
 
     faction: Faction
-    for faction in Faction.select().where((len(Faction.aa_keys) == 0)):  # TODO: This might not work
+    for faction in Faction.select().where((Faction.aa_keys != [])):
         if len(faction.aa_keys) == 0:
             continue
         elif faction.last_attacks == 0:
-            faction.last_attacks = int(time.time())
+            faction.last_attacks = datetime.datetime.utcnow()
             faction.save()
             continue
         elif time.time() - faction.last_attacks > 86400:  # One day
             # Prevents old data from being added (especially for retals)
-            faction.last_attacks = int(time.time())
+            faction.last_attacks = datetime.datetime.utcnow()
             faction.save()
             continue
 
         aa_key = random.choice(faction.aa_keys)
+        last_attacks: int = faction.last_attacks.timestamp()
 
         tornget.signature(
             kwargs={
                 "endpoint": "faction/?selections=basic,attacks",
-                "fromts": faction.last_attacks + 1,  # timestamp is inclusive
+                "fromts": last_attacks + 1,  # timestamp is inclusive
                 "key": aa_key,
             },
             queue="api",
@@ -546,13 +547,13 @@ def fetch_attacks_runner():
             link=celery.group(
                 retal_attacks.signature(
                     kwargs={
-                        "last_attacks": faction.last_attacks,
+                        "last_attacks": last_attacks
                     },
                     queue="quick",
                 ),
                 stat_db_attacks.signature(
                     kwargs={
-                        "last_attacks": faction.last_attacks,
+                        "last_attacks": last_attacks
                     },
                     queue="quick",
                 ),
