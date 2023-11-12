@@ -68,7 +68,7 @@ def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, r
         update_self = True
     else:
         try:
-            user_exists = User.get(User.discord_id == discordid).exists()
+            user_exists = User.select().where(User.discord_id == discordid).exists()
         except DoesNotExist:
             user_exists = False
 
