@@ -511,9 +511,7 @@ def stat_db_attacks_user(user_data):
                 "tid": opponent_id,
                 "battlescore": int(opponent_score),
                 "time_added": datetime.datetime.fromtimestamp(attack["timestamp_ended"]),
-                "added_tid": user.tid,
-                "added_faction_tid": user.faction.tid if user.faction is not None else None,
-                "global_stat": True,
+                "added_group": 0,
             }
         )
 

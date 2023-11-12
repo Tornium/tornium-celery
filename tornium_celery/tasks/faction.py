@@ -546,15 +546,11 @@ def fetch_attacks_runner():
             expires=300,
             link=celery.group(
                 retal_attacks.signature(
-                    kwargs={
-                        "last_attacks": last_attacks
-                    },
+                    kwargs={"last_attacks": last_attacks},
                     queue="quick",
                 ),
                 stat_db_attacks.signature(
-                    kwargs={
-                        "last_attacks": last_attacks
-                    },
+                    kwargs={"last_attacks": last_attacks},
                     queue="quick",
                 ),
             ),
@@ -694,7 +690,7 @@ def retal_attacks(faction_data, last_attacks=None):
                         Stat.select()
                         .where(
                             (Stat.tid == opponent.tid)
-                            & ((Stat.global_stat == True) | (Stat.added_faction_tid == user.faction.tid))  # noqa: E712
+                            & ((Stat.added_group == 0) | (Stat.added_group == user.faction_id))
                         )
                         .order_by(Stat.time_added)
                         .first()
@@ -702,7 +698,7 @@ def retal_attacks(faction_data, last_attacks=None):
                 else:
                     stat = (
                         Stat.select()
-                        .where((Stat.tid == opponent.tid) & (Stat.global_stat == True))  # noqa: E712
+                        .where((Stat.tid == opponent.tid) & (Stat.added_group == 0))
                         .order_by(Stat.time_added)
                         .first()
                     )
@@ -928,9 +924,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
                 tid=opponent_id,
                 battlescore=opponent_score,
                 time_added=datetime.datetime.fromtimestamp(attack["timestamp_ended"], tz=datetime.timezone.utc),
-                added_tid=user_id,
-                added_faction_tid=user.faction.tid,
-                global_stat=faction.stats_db_global,
+                added_group=0 if faction.stats_db_global else user.faction_id,
             )
             stat_entry.save()
         except Exception as e:
