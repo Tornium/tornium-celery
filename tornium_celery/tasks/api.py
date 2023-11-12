@@ -36,6 +36,7 @@ from tornium_commons.errors import (
 from .misc import remove_key_error
 
 logger = get_task_logger("celery_app")
+config = Config.from_cache()
 
 
 def backoff(self: celery.Task):
@@ -138,7 +139,7 @@ def tornget(
 )
 def discordget(self: celery.Task, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
-    headers = {"Authorization": f'Bot {Config.from_cache()["skynet-bottoken"]}'}
+    headers = {"Authorization": f'Bot {config["bot_token"]}'}
 
     bucket = discord_ratelimit_pre(self, "GET", endpoint, backoff_var=kwargs.get("backoff", True))
 
@@ -187,7 +188,7 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
 def discordpatch(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
-        "Authorization": f'Bot {Config.from_cache()["skynet-bottoken"]}',
+        "Authorization": f'Bot {config["bot_token"]}',
         "Content-Type": "application/json",
     }
 
@@ -243,7 +244,7 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
 def discordpost(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
-        "Authorization": f'Bot {Config.from_cache()["skynet-bottoken"]}',
+        "Authorization": f'Bot {config["bot_token"]}',
         "Content-Type": "application/json",
     }
 
@@ -299,7 +300,7 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
 def discordput(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
-        "Authorization": f'Bot {Config.from_cache()["skynet-bottoken"]}',
+        "Authorization": f'Bot {config["bot_token"]}',
         "Content-Type": "application/json",
     }
 
@@ -355,7 +356,7 @@ def discordput(self, endpoint, payload, *args, **kwargs):
 def discorddelete(self, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
-        "Authorization": f'Bot {Config.from_cache()["skynet-bottoken"]}',
+        "Authorization": f'Bot {config["bot_token"]}',
         "Content-Type": "application/json",
     }
 
