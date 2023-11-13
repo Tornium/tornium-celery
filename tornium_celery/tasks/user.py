@@ -436,7 +436,7 @@ def stat_db_attacks_user(user_data):
             3,
         ):  # 3x FF can be greater than the defender battlescore indicated
             continue
-        elif attack["timestamp_ended"] <= user.last_attacks:
+        elif attack["timestamp_ended"] <= user.last_attacks.timestamp():
             continue
         elif attack["respect"] == 0:
             continue

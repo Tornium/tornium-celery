@@ -85,7 +85,7 @@ def refresh_factions():
 
         user: User
         for user in aa_users:
-            if user.key == "" or user.key is None:
+            if user.key in (None, ""):
                 if user.faction_aa:
                     user.faction_aa = False
                     user.save()
@@ -123,8 +123,6 @@ def refresh_factions():
         if ts_key != "":
             torn_stats_get.signature(
                 kwargs={"endpoint": f"spy/faction/{faction.tid}", "key": ts_key},
-                queue="api",
-            ).apply_async(
                 expires=300,
                 link=update_faction_ts.s(),
             )
@@ -362,11 +360,7 @@ def update_faction_ts(faction_ts_data):
             continue
 
         try:
-            user: User = (
-                User.select()
-                .where(User.tid == int(user_id))
-                .get()
-            )
+            user: User = User.select().where(User.tid == int(user_id)).get()
         except DoesNotExist:
             continue
 
@@ -853,7 +847,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
             if user is None or user.battlescore == 0:
                 continue
-            elif time.time() - user.battlescore_update.timestamp() > 259200:  # Three days
+            elif user.battlescore_update is None or time.time() - user.battlescore_update.timestamp() > 259200:  # Three days
                 continue
 
             user_score = user.battlescore
@@ -874,7 +868,9 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
             if user is None or user.battlescore == 0:
                 continue
-            elif user.battlescore_update is None or time.time() - user.battlescore_update.timestamp() > 259200:  # Three days
+            elif (
+                user.battlescore_update is None or time.time() - user.battlescore_update.timestamp() > 259200
+            ):  # Three days
                 continue
 
             user_score = user.battlescore
@@ -1452,7 +1448,7 @@ def armory_check_subtask(_armory_data, faction_id: int):
                                 "url": f"https://www.torn.com/imarket.php#/p=shop&step=shop&type=&searchname={armory_item['ID']}",
                             },
                         ],
-                    }
+                    },
                 ],
             }
 
