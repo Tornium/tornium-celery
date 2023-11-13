@@ -573,6 +573,8 @@ def retal_attacks(faction_data, last_attacks=None):
 
     if last_attacks is None or last_attacks >= time.time():
         last_attacks = faction.last_attacks.timestamp()
+    
+    now = int(time.time())
 
     for attack in faction_data["attacks"].values():
         if attack["result"] in [
@@ -606,6 +608,8 @@ def retal_attacks(faction_data, last_attacks=None):
         elif (
             attack["modifiers"]["overseas"] == 1.25 and attack["modifiers"]["war"] == 1
         ):  # Overseas attack when not in war
+            continue
+        elif now - attack["timestamp_ended"] >= 300:
             continue
 
         user: typing.Optional[User] = User.select().where(User.tid == attack["defender_id"]).first()
@@ -805,6 +809,9 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
     if last_attacks is None or last_attacks >= int(time.time()):
         last_attacks = faction.last_attacks
+
+    faction.last_attacks = datetime.datetime.fromtimestamp(list(faction_data["attacks"].values())[-1]["timestamp_ended"], tz=datetime.timezone.utc)
+    faction.save()
 
     attack: dict
     for attack in faction_data["attacks"].values():
