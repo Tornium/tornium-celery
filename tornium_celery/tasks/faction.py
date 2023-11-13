@@ -208,7 +208,7 @@ def update_faction(faction_data):
                 and position.name not in faction_data["positions"].keys()
             ):
                 positions_names.remove(position.name)
-                position.delete()
+                position.delete_instance()
                 continue
 
             position_perms = faction_data["positions"][position.name]

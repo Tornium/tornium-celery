@@ -97,7 +97,7 @@ def send_notification(notification: Notification, payload: dict):
         return
 
     if not notification.persistent:
-        notification.delete()
+        notification.delete_instance()
 
 
 def get_destination(status_description: str):
