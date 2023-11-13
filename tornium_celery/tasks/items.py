@@ -22,7 +22,7 @@ import celery
 import playhouse.postgres_ext
 from celery.utils.log import get_task_logger
 from peewee import chunked, fn
-from tornium_commons import rds
+from tornium_commons import db, rds
 from tornium_commons.formatters import commas, torn_timestamp
 from tornium_commons.models import Item, Notification, Server, User
 from tornium_commons.skyutils import SKYNET_INFO
@@ -64,7 +64,7 @@ def update_items_pre():
     routing_key="quick.items.update_items",
     queue="quick",
 )
-def update_items(items_data, database: playhouse.postgres_ext.PostgresqlExtDatabase):
+def update_items(items_data):
     # From tornium_commons.models.Item.update_items()
     bulk_data = []
 
@@ -83,7 +83,7 @@ def update_items(items_data, database: playhouse.postgres_ext.PostgresqlExtDatab
             }
         )
 
-    with database.atomic():
+    with db().atomic():
         for batch in chunked(bulk_data, 100):
             Item.replace_many(batch).execute()  # TODO: Might not work in PG (might be meant for sqlite)
 

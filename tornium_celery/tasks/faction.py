@@ -288,7 +288,7 @@ def update_faction(faction_data):
 
         if "positions" in faction_data:
             User.insert(
-                tid=member["player_id"],
+                tid=int(member_id),
                 name=member["name"],
                 level=member["level"],
                 faction=faction_data["ID"],
@@ -363,15 +363,7 @@ def update_faction_ts(faction_ts_data):
 
         try:
             user: User = (
-                User.select(
-                    User.key,
-                    User.battlescore,
-                    User.strength,
-                    User.defense,
-                    User.speed,
-                    User.dexterity,
-                    User.battlescore_update,
-                )
+                User.select()
                 .where(User.tid == int(user_id))
                 .get()
             )
@@ -585,7 +577,7 @@ def retal_attacks(faction_data, last_attacks=None):
     except KeyError:
         return
 
-    if last_attacks is None or last_attacks >= datetime.datetime.utcnow():
+    if last_attacks is None or last_attacks >= time.time():
         last_attacks = faction.last_attacks.timestamp()
 
     for attack in faction_data["attacks"].values():
@@ -882,7 +874,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
             if user is None or user.battlescore == 0:
                 continue
-            elif time.time() - user.battlescore_update.timestamp() > 259200:  # Three days
+            elif user.battlescore_update is None or time.time() - user.battlescore_update.timestamp() > 259200:  # Three days
                 continue
 
             user_score = user.battlescore

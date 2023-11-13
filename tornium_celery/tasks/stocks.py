@@ -100,7 +100,7 @@ def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datet
             VALUES
         """
 
-        for stock in stocks_data.values():
+        for stock in stocks_data["stocks"].values():
             cmd += f"({int(bin(stock['stock_id']), 2) + int(binary_timestamp, 2)}, {stocks_timestamp}, {stock['stock_id']}, {stock['current_price']}, {stock['market_cap']}, {stock['total_shares']}, {stock['investors']}),\n"
 
             stocks[stock["stock_id"]] = stock["acronym"]
