@@ -444,7 +444,7 @@ def stat_db_attacks_user(user_data):
             continue
 
         try:
-            if user.battlescore_update - int(time.time()) <= 259200:  # Three days
+            if user.battlescore_update.timestamp() - int(time.time()) <= 259200:  # Three days
                 user_score = user.battlescore
             else:
                 continue

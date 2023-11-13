@@ -84,7 +84,7 @@ def stocks_prefetch():
     )
 
 
-@celery.shared_task(name="tasks.stocks.update_stock_prices", routing_key="quick.update_stocks_prices", queue="quick")
+@celery.shared_task(name="tasks.stocks.update_stock_prices", routing_key="quick.update_stock_prices", queue="quick")
 def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datetime.datetime.utcnow()):
     if stocks_data is None:
         raise ValueError

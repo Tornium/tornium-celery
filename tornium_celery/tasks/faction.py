@@ -608,8 +608,8 @@ def retal_attacks(faction_data, last_attacks=None):
         ):  # Overseas attack when not in war
             continue
 
-        user: typing.Optional[User] = User.select().get_or_none(User.tid == attack["defender_id"])
-        opponent: typing.Optional[User] = User.select().get_or_none(User.tid == attack["attacker_id"])
+        user: typing.Optional[User] = User.select().where(User.tid == attack["defender_id"]).first()
+        opponent: typing.Optional[User] = User.select().where(User.tid == attack["attacker_id"]).first()
 
         if user is None:
             user = User(
@@ -852,7 +852,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
             user_score = user.battlescore
 
-            opponent: typing.Optional[User] = User.select().where(User.tid == attack["attack_id"]).first()
+            opponent: typing.Optional[User] = User.select().where(User.tid == attack["attacker_id"]).first()
             opponent_id = attack["attacker_id"]
 
             if opponent is None:
