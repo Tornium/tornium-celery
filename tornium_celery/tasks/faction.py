@@ -986,7 +986,7 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
     for oc_id, oc_data in oc_data["crimes"].items():
         oc_db: OrganizedCrime = (
             OrganizedCrime.select()
-            .join(User)
+            .join(User, on=OrganizedCrime.initiated_by)
             .where((OrganizedCrime.faction_tid == faction.tid) & (OrganizedCrime.oc_id == oc_id))
             .get()
         )
