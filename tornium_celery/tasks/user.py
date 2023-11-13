@@ -436,7 +436,7 @@ def stat_db_attacks_user(user_data):
             3,
         ):  # 3x FF can be greater than the defender battlescore indicated
             continue
-        elif attack["timestamp_ended"] <= user.last_attacks.timestamp():
+        elif user.last_attacks is not None and attack["timestamp_ended"] <= user.last_attacks.timestamp():
             continue
         elif attack["respect"] == 0:
             continue
@@ -444,7 +444,7 @@ def stat_db_attacks_user(user_data):
             continue
 
         try:
-            if user.battlescore_update.timestamp() - int(time.time()) <= 259200:  # Three days
+            if user.battlescore_update is not None and user.battlescore_update.timestamp() - int(time.time()) <= 259200:  # Three days
                 user_score = user.battlescore
             else:
                 continue

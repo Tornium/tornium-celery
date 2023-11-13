@@ -366,7 +366,7 @@ def update_faction_ts(faction_ts_data):
 
         if user.key is not None:
             continue
-        elif user_data["spy"]["timestamp"] <= user.battlescore_update.timestamp():
+        elif user.battlescore_update is not None and user_data["spy"]["timestamp"] <= user.battlescore_update.timestamp():
             continue
 
         user.battlescore = (
@@ -644,7 +644,7 @@ def retal_attacks(faction_data, last_attacks=None):
 
         if attack["modifiers"]["fair_fight"] != 3:
             if (
-                user is not None and user.battlescore != 0 and int(time.time()) - user.battlescore_update <= 259200
+                user is not None and user.battlescore != 0 and user.battlescore_update is not None and int(time.time()) - user.battlescore_update.timestamp() <= 259200
             ):  # Three days
                 try:
                     opponent_score = user.battlescore / ((attack["modifiers"]["fair_fight"] - 1) * 0.375)
