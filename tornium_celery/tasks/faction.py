@@ -80,9 +80,7 @@ ATTACK_RESULTS = {
 def refresh_factions():
     faction: Faction
     for faction in Faction.select().join(Server):
-        aa_users = User.select().where(
-            (User.faction_aa == True) & (User.faction.is_null(False))  # noqa: E712
-        )
+        aa_users = User.select().where((User.faction_aa == True) & (User.faction.is_null(False)))  # noqa: E712
         keys = set()
 
         user: User
@@ -408,7 +406,7 @@ def update_faction_ts(faction_ts_data):
 )
 def check_faction_ods(faction_od_data):
     try:
-        faction: Faction = Faction.select().join(Server).get_by_id(faction_od_data["ID"])
+        faction: Faction = Faction.select().join(Server).where(Faction.tid == faction_od_data["ID"]).get()
     except (KeyError, DoesNotExist):
         return
 
@@ -565,7 +563,7 @@ def retal_attacks(faction_data, last_attacks=None):
         return
 
     try:
-        faction: Faction = Faction.select().join(Server).get_by_id(faction_data["ID"])
+        faction: Faction = Faction.select().join(Server).where(Faction.tid == faction_data["ID"]).get()
     except (KeyError, DoesNotExist):
         return
 
@@ -812,7 +810,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
         return
 
     try:
-        faction: Faction = Faction.select().get_by_id(faction_data["ID"])
+        faction: Faction = Faction.select().where(Faction.tid == faction_data["ID"]).get()
     except (KeyError, DoesNotExist):
         return
 

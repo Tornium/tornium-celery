@@ -522,5 +522,7 @@ def stat_db_attacks_user(user_data):
     except Exception as e:
         logger.exception(e)
 
-    user.last_attacks = list(user_data["attacks"].values())[-1]["timestamp_ended"]
+    user.last_attacks = datetime.datetime.fromtimestamp(
+        list(user_data["attacks"].values())[-1]["timestamp_ended"], tz=datetime.timezone.utc
+    )
     user.save()
