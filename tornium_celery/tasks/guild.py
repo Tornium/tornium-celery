@@ -176,7 +176,7 @@ def verify_users(
             Server.admins,
             Server.verify_log_channel,
             Server.exclusion_roles,
-        ).get_by_id(guild_id)
+        ).where(Server.sid == guild_id).get()
     except DoesNotExist:
         raise LookupError
 
