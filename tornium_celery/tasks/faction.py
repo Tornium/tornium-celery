@@ -80,7 +80,7 @@ ATTACK_RESULTS = {
 def refresh_factions():
     faction: Faction
     for faction in Faction.select().join(Server):
-        aa_users = User.select(User.key, User.faction_aa).where(
+        aa_users = User.select().where(
             (User.faction_aa == True) & (User.faction.is_null(False))  # noqa: E712
         )
         keys = set()
@@ -522,11 +522,11 @@ def fetch_attacks_runner():
     for faction in Faction.select().where((Faction.aa_keys != [])):
         if len(faction.aa_keys) == 0:
             continue
-        elif faction.last_attacks == 0:
+        elif faction.last_attacks is None or faction.last_attacks.timestamp() == 0:
             faction.last_attacks = datetime.datetime.utcnow()
             faction.save()
             continue
-        elif time.time() - faction.last_attacks > 86400:  # One day
+        elif time.time() - faction.last_attacks.timestamp() > 86401:  # One day
             # Prevents old data from being added (especially for retals)
             faction.last_attacks = datetime.datetime.utcnow()
             faction.save()
@@ -587,7 +587,7 @@ def retal_attacks(faction_data, last_attacks=None):
     except KeyError:
         return
 
-    if last_attacks is None or last_attacks >= int(time.time()):
+    if last_attacks is None or last_attacks >= datetime.datetime.utcnow():
         last_attacks = faction.last_attacks.timestamp()
 
     for attack in faction_data["attacks"].values():

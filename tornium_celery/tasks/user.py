@@ -331,7 +331,7 @@ def update_user_other(user_data):
 )
 def refresh_users():
     user: User
-    for user in User.select(User.key != ""):
+    for user in User.select().where((User.key.is_null(False)) & (User.key != "")):
         tornget.signature(
             kwargs={
                 "endpoint": "user/?selections=profile,discord,personalstats,battlestats",
@@ -369,7 +369,7 @@ def fetch_attacks_user_runner():
         redis.expire("tornium:celery-lock:fetch-attacks-user", 1)
 
     user: User
-    for user in User.select(User.key != ""):
+    for user in User.select().where((User.key.is_null(False)) & (User.key != "")):
         if user.faction_aa:
             continue
         if user.last_attacks is None:
