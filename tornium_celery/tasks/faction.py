@@ -412,7 +412,7 @@ def check_faction_ods(faction_od_data):
 
     for tid, user_od in faction_od_data["contributors"]["drugoverdoses"].items():
         if faction.od_data.get(tid) is None and user_od["contributed"] > 0:
-            overdosed_user: typing.Optional[User] = User.select(User.name).get_or_none(User.tid == tid)
+            overdosed_user: typing.Optional[User] = User.select(User.name).where(User.tid == tid).first()
             payload = {
                 "embeds": [
                     {
@@ -930,7 +930,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
     Faction.update(
         last_attacks=datetime.datetime.fromtimestamp(
-            list(faction_data["attacks"].values())[-1]["timestamp_ended"], tz=datetime.timzeon.utcnow
+            list(faction_data["attacks"].values())[-1]["timestamp_ended"], tz=datetime.timezone.utc
         )
     ).where(Faction.tid == faction_data["ID"]).execute()
 
@@ -999,30 +999,45 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
             OrganizedCrime.select()
             .join(User, on=OrganizedCrime.initiated_by)
             .where((OrganizedCrime.faction_tid == faction.tid) & (OrganizedCrime.oc_id == oc_id))
-            .get()
+            .first()
         )
-        oc_db.crime_id = oc_data["crime_id"]
-        oc_db.participants = [int(list(participant.keys())[0]) for participant in oc_data["participants"]]
-        oc_db.time_started = (
-            None
+
+        OrganizedCrime.insert(
+            faction_tid=faction.tid,
+            oc_id=oc_id,
+            crime_id=oc_data["crime_id"],
+            participants=[int(list(participants.keys())[0]) for participant in oc_data["participants"]],
+            time_started=None
             if oc_data["time_started"] == 0
-            else datetime.datetime.fromtimestamp(oc_data["time_started"], tz=datetime.timezone.utc)
-        )
-        oc_db.time_ready = (
-            None
+            else datetime.datetime.fromtimestamp(oc_data["time_started"], tz=datetime.timezone.utc),
+            time_ready=None
             if oc_data["time_ready"] == 0
-            else datetime.datetime.fromtimestamp(oc_data["time_ready"], tz=datetime.timezone.utc)
-        )
-        oc_db.time_completed = (
-            None
+            else datetime.datetime.fromtimestamp(oc_data["time_ready"], tz=datetime.timezone.utc),
+            time_completed=None
             if oc_data["time_completed"] == 0
-            else datetime.datetime.fromtimestamp(oc_data["time_completed"], tz=datetime.timezone.utc)
-        )
-        oc_db.planned_by = oc_data["planned_by"]
-        oc_db.initiated_by = None if oc_data["initiated_by"] == 0 else oc_data["initiated_by"]
-        oc_db.money_gain = None if oc_data["money_gain"] == 0 else oc_data["money_gain"]
-        oc_db.respect_gain = None if oc_data["respect_gain"] == 0 else oc_data["respect_gain"]
-        oc_db.save()
+            else datetime.datetime.fromtimestamp(oc_data["time_completed"], tz=datetime.timezone.utc),
+            planned_by=oc_data["planned_by"],
+            initiated_by=oc_data["initiated_by"],
+            money_gain=oc_data["money_gain"],
+            respect_gain=oc_data["respect_gain"],
+            delayers=[],
+        ).on_conflict(
+            conflict_target=[OrganizedCrime.oc_id],
+            preserve=[
+                OrganizedCrime.faction_tid,
+                OrganizedCrime.crime_id,
+                OrganizedCrime.participants,
+                OrganizedCrime.time_started,
+                OrganizedCrime.time_completed,
+                OrganizedCrime.planned_by,
+                OrganizedCrime.initiated_by,
+                OrganizedCrime.money_gain,
+                OrganizedCrime.respect_gain,
+                OrganizedCrime.delayers,
+                OrganizedCrime.notified,
+                OrganizedCrime.initiated,
+            ],
+        ).execute()
 
         if oc_db.time_completed is not None:
             if (

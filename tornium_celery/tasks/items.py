@@ -41,51 +41,12 @@ logger = get_task_logger("celery_app")
 
 
 @celery.shared_task(
-    name="tasks.items.update_items_pre",
-    routing_key="quick.items.update_items_pre",
-    queue="quick",
-)
-def update_items_pre():
-    tornget.signature(
-        kwargs={
-            "endpoint": "torn/?selections=items",
-            "key": User.select(User.key)
-            .where((User.key.is_null(False)) & (User.key != ""))
-            .order_by(fn.Random())
-            .get()
-            .key,
-        },
-        queue="api",
-    ).apply_async(expires=300, link=update_items.s())
-
-
-@celery.shared_task(
     name="tasks.items.update_items",
-    routing_key="quick.items.update_items",
-    queue="quick",
+    routing_key="default.items.update_items",
+    queue="default",
 )
 def update_items(items_data):
-    # From tornium_commons.models.Item.update_items()
-    bulk_data = []
-
-    # TODO: Combine DB chunked insert and data compilation
-    item_id: int
-    item: dict
-    for item_id, item in items_data["items"].items():
-        bulk_data.append(
-            {
-                "tid": int(item_id),
-                "name": item.get("name", ""),
-                "description": item.get("description", ""),
-                "type": item.get("type", ""),
-                "market_value": item.get("market_value", 0),
-                "circulation": item.get("circulation", 0),
-            }
-        )
-
-    with db().atomic():
-        for batch in chunked(bulk_data, 100):
-            Item.replace_many(batch).execute()  # TODO: Might not work in PG (might be meant for sqlite)
+    Item.update_items(torn_get=tornget, key=User.random_key())
 
     rds().set(
         "tornium:items:last-update",

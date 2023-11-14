@@ -156,7 +156,7 @@ if celery_app is None:
                 "schedule": {"type": "periodic", "second": "30"},
             },  # Item tasks
             "update-items": {
-                "task": "tasks.items.update_items_pre",
+                "task": "tasks.items.update_items",
                 "enabled": True,
                 "schedule": {"type": "cron", "minute": "0", "hour": "*/4"},
             },
