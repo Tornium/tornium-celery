@@ -366,7 +366,9 @@ def update_faction_ts(faction_ts_data):
 
         if user.key is not None:
             continue
-        elif user.battlescore_update is not None and user_data["spy"]["timestamp"] <= user.battlescore_update.timestamp():
+        elif (
+            user.battlescore_update is not None and user_data["spy"]["timestamp"] <= user.battlescore_update.timestamp()
+        ):
             continue
 
         user.battlescore = (
@@ -573,7 +575,7 @@ def retal_attacks(faction_data, last_attacks=None):
 
     if last_attacks is None or last_attacks >= time.time():
         last_attacks = faction.last_attacks.timestamp()
-    
+
     now = int(time.time())
 
     for attack in faction_data["attacks"].values():
@@ -648,7 +650,10 @@ def retal_attacks(faction_data, last_attacks=None):
 
         if attack["modifiers"]["fair_fight"] != 3:
             if (
-                user is not None and user.battlescore != 0 and user.battlescore_update is not None and int(time.time()) - user.battlescore_update.timestamp() <= 259200
+                user is not None
+                and user.battlescore != 0
+                and user.battlescore_update is not None
+                and int(time.time()) - user.battlescore_update.timestamp() <= 259200
             ):  # Three days
                 try:
                     opponent_score = user.battlescore / ((attack["modifiers"]["fair_fight"] - 1) * 0.375)
@@ -810,9 +815,6 @@ def stat_db_attacks(faction_data, last_attacks=None):
     if last_attacks is None or last_attacks >= int(time.time()):
         last_attacks = faction.last_attacks
 
-    faction.last_attacks = datetime.datetime.fromtimestamp(list(faction_data["attacks"].values())[-1]["timestamp_ended"], tz=datetime.timezone.utc)
-    faction.save()
-
     attack: dict
     for attack in faction_data["attacks"].values():
         if attack["result"] in [
@@ -854,7 +856,9 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
             if user is None or user.battlescore == 0:
                 continue
-            elif user.battlescore_update is None or time.time() - user.battlescore_update.timestamp() > 259200:  # Three days
+            elif (
+                user.battlescore_update is None or time.time() - user.battlescore_update.timestamp() > 259200
+            ):  # Three days
                 continue
 
             user_score = user.battlescore
@@ -924,11 +928,11 @@ def stat_db_attacks(faction_data, last_attacks=None):
             logger.exception(e)
             continue
 
-    faction.last_attacks = datetime.datetime.fromtimestamp(
-        list(faction_data["attacks"].values())[-1]["timestamp_ended"],
-        tz=datetime.timezone.utc,
-    )
-    faction.save()
+    Faction.update(
+        last_attacks=datetime.datetime.fromtimestamp(
+            list(faction_data["attacks"].values())[-1]["timestamp_ended"], tz=datetime.timzeon.utcnow
+        )
+    ).where(Faction.tid == faction_data["ID"]).execute()
 
 
 @celery.shared_task(name="tasks.faction.oc_refresh", routing_key="quick.oc_refresh", queue="quick")

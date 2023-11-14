@@ -168,15 +168,19 @@ def verify_users(
     #  n: channel ID
 
     try:
-        guild: Server = Server.select(
-            Server.verify_enabled,
-            Server.verify_template,
-            Server.verified_roles,
-            Server.faction_verify,
-            Server.admins,
-            Server.verify_log_channel,
-            Server.exclusion_roles,
-        ).where(Server.sid == guild_id).get()
+        guild: Server = (
+            Server.select(
+                Server.verify_enabled,
+                Server.verify_template,
+                Server.verified_roles,
+                Server.faction_verify,
+                Server.admins,
+                Server.verify_log_channel,
+                Server.exclusion_roles,
+            )
+            .where(Server.sid == guild_id)
+            .get()
+        )
     except DoesNotExist:
         raise LookupError
 
