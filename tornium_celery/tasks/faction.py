@@ -1006,7 +1006,7 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
             faction_tid=faction.tid,
             oc_id=oc_id,
             crime_id=oc_data["crime_id"],
-            participants=[int(list(participants.keys())[0]) for participant in oc_data["participants"]],
+            participants=[int(list(participant.keys())[0]) for participant in oc_data["participants"]],
             time_started=None
             if oc_data["time_started"] == 0
             else datetime.datetime.fromtimestamp(oc_data["time_started"], tz=datetime.timezone.utc),
