@@ -975,23 +975,29 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
 
     if faction.guild is None:
         return
-
-    OC_DELAY = faction.guild.oc_config[str(faction.tid)].get("delay", {"channel": 0, "roles": []}).get(
-        "channel"
-    ) not in [
-        None,
-        0,
-    ]
-    OC_READY = faction.guild.oc_config[str(faction.tid)].get("ready", {"channel": 0, "roles": []}).get(
-        "channel"
-    ) not in [
-        None,
-        0,
-    ]
-    OC_INITIATED = faction.guild.oc_config[str(faction.tid)].get("initiated", {"channel": 0}).get("channel") not in [
-        None,
-        0,
-    ]
+    if str(faction.tid) in faction.guild.oc_config:
+        OC_DELAY = faction.guild.oc_config[str(faction.tid)].get("delay", {"channel": 0, "roles": []}).get(
+            "channel"
+        ) not in [
+            None,
+            0,
+        ]
+        OC_READY = faction.guild.oc_config[str(faction.tid)].get("ready", {"channel": 0, "roles": []}).get(
+            "channel"
+        ) not in [
+            None,
+            0,
+        ]
+        OC_INITIATED = faction.guild.oc_config[str(faction.tid)].get("initiated", {"channel": 0}).get(
+            "channel"
+        ) not in [
+            None,
+            0,
+        ]
+    else:
+        OC_DELAY = False
+        OC_READY = False
+        OC_INITIATED = False
 
     # OC ready/delay/init notifs
     for oc_id, oc_data in oc_data["crimes"].items():
