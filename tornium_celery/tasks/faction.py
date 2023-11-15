@@ -83,7 +83,6 @@ def refresh_factions():
         aa_users = User.select().where((User.faction_aa == True) & (User.faction_id == faction.tid))  # noqa: E712
         keys = set()
 
-
         user: User
         for user in aa_users:
             if user.key in (None, ""):
@@ -164,7 +163,9 @@ def update_faction(faction_data):
         respect=faction_data["respect"],
         capacity=faction_data["capacity"],
         leader=User.select().where(User.tid == faction_data["leader"]).first(),
-        coleader=User.select().where(User.tid == faction_data["co-leader"]).first() if faction_data["co-leader"] != 0 else None,
+        coleader=User.select().where(User.tid == faction_data["co-leader"]).first()
+        if faction_data["co-leader"] != 0
+        else None,
         last_members=datetime.datetime.utcnow(),
     ).on_conflict(
         conflict_target=[Faction.tid],

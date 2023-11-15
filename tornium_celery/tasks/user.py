@@ -150,10 +150,14 @@ def update_user_self(user_data, key=None):
             "Leader",
             "Co-Leader",
         ):
-            faction_position: typing.Optional[FactionPosition] = FactionPosition.select().where(
-                (FactionPosition.name == user_data["faction"]["position"])
-                & (FactionPosition.faction_tid == user_data["faction"]["faction_id"])
-            ).first()
+            faction_position: typing.Optional[FactionPosition] = (
+                FactionPosition.select()
+                .where(
+                    (FactionPosition.name == user_data["faction"]["position"])
+                    & (FactionPosition.faction_tid == user_data["faction"]["faction_id"])
+                )
+                .first()
+            )
 
             if faction_position is None:
                 user_data_kwargs["faction_position"] = None
@@ -262,10 +266,14 @@ def update_user_other(user_data):
             "Leader",
             "Co-Leader",
         ):
-            faction_position: typing.Optional[FactionPosition] = FactionPosition.select().where(
-                (FactionPosition.name == user_data["faction"]["position"])
-                & (FactionPosition.faction_tid == user_data["faction"]["faction_id"])
-            ).first()
+            faction_position: typing.Optional[FactionPosition] = (
+                FactionPosition.select()
+                .where(
+                    (FactionPosition.name == user_data["faction"]["position"])
+                    & (FactionPosition.faction_tid == user_data["faction"]["faction_id"])
+                )
+                .first()
+            )
 
             if faction_position is None:
                 user_data_kwargs["faction_position"] = None
