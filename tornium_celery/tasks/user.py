@@ -21,7 +21,7 @@ from decimal import DivisionByZero
 
 import celery
 from celery.utils.log import get_task_logger
-from peewee import DoesNotExist
+from peewee import DoesNotExist, IntegrityError
 from tornium_commons import db, rds
 from tornium_commons.errors import MissingKeyError
 from tornium_commons.models import Faction, FactionPosition, PersonalStats, Stat, User
@@ -214,12 +214,15 @@ def update_user_self(user_data, key=None):
         second=0,
     ).replace(tzinfo=datetime.timezone.utc)
 
-    PersonalStats.create(
-        pstat_id=int(bin(user_data["player_id"] << 8), 2) + int(bin(int(now.timestamp())), 2),
-        tid=user_data["player_id"],
-        timestamp=now,
-        **{k: v for k, v in user_data["personalstats"].items() if k in PersonalStats._meta.sorted_field_names},
-    ).save()
+    try:
+        PersonalStats.create(
+            pstat_id=int(bin(user_data["player_id"] << 8), 2) + int(bin(int(now.timestamp())), 2),
+            tid=user_data["player_id"],
+            timestamp=now,
+            **{k: v for k, v in user_data["personalstats"].items() if k in PersonalStats._meta.sorted_field_names},
+        )
+    except IntegrityError:
+        pass
 
 
 @celery.shared_task(
@@ -307,12 +310,15 @@ def update_user_other(user_data):
         .timestamp()
     )
 
-    PersonalStats.create(
-        pstat_id=int(bin(user_data["player_id"] << 8), 2) + int(bin(now), 2),
-        tid=user_data["player_id"],
-        timestamp=datetime.datetime.utcnow(),
-        **{k: v for k, v in user_data["personalstats"].items() if k in PersonalStats._meta.sorted_field_names},
-    ).save()
+    try:
+        PersonalStats.create(
+            pstat_id=int(bin(user_data["player_id"] << 8), 2) + int(bin(now), 2),
+            tid=user_data["player_id"],
+            timestamp=datetime.datetime.utcnow(),
+            **{k: v for k, v in user_data["personalstats"].items() if k in PersonalStats._meta.sorted_field_names},
+        )
+    except IntegrityError:
+        pass
 
     # TODO: What is this for?
     try:
