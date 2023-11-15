@@ -163,7 +163,7 @@ def update_user_self(user_data, key=None):
                 user_data_kwargs["faction_aa"] = faction_position.access_fac_api
     else:
         faction = None
-        user_data_kwargs["faction_position"] = faction_position
+        user_data_kwargs["faction_position"] = None
         user_data_kwargs["faction_aa"] = False
 
     User.insert(

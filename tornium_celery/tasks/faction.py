@@ -163,8 +163,8 @@ def update_faction(faction_data):
         tag=str(faction_data["tag"]),  # Torn occasionally uses integers as tags
         respect=faction_data["respect"],
         capacity=faction_data["capacity"],
-        leader=User.get_or_none(User.tid == faction_data["leader"]),
-        coleader=User.get_or_none(User.tid == faction_data["co-leader"]) if faction_data["co-leader"] != 0 else None,
+        leader=User.select().where(User.tid == faction_data["leader"]).first(),
+        coleader=User.select().where(User.tid == faction_data["co-leader"]).first() if faction_data["co-leader"] != 0 else None,
         last_members=datetime.datetime.utcnow(),
     ).on_conflict(
         conflict_target=[Faction.tid],
@@ -447,7 +447,7 @@ def check_faction_ods(faction_od_data):
         elif faction.od_data.get(tid) is not None and user_od["contributed"] != faction.od_data.get(tid).get(
             "contributed"
         ):
-            overdosed_user: typing.Optional[User] = User.select(User.name).get_or_none(User.tid == tid)
+            overdosed_user: typing.Optional[User] = User.select(User.name).where(User.tid == tid).first()
             payload = {
                 "embeds": [
                     {
