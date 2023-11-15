@@ -218,7 +218,7 @@ def update_user_self(user_data, key=None):
         pstat_id=int(bin(user_data["player_id"] << 8), 2) + int(bin(int(now.timestamp())), 2),
         tid=user_data["player_id"],
         timestamp=now,
-        **{k: v for k, v in user_data["personalstats"] if k in PersonalStats._meta.sorted_field_names},
+        **{k: v for k, v in user_data["personalstats"].items() if k in PersonalStats._meta.sorted_field_names},
     ).save()
 
 
@@ -311,7 +311,7 @@ def update_user_other(user_data):
         pstat_id=int(bin(user_data["player_id"] << 8), 2) + int(bin(now), 2),
         tid=user_data["player_id"],
         timestamp=datetime.datetime.utcnow(),
-        **{k: v for k, v in user_data["personalstats"] if k in PersonalStats._meta.sorted_field_names},
+        **{k: v for k, v in user_data["personalstats"].items() if k in PersonalStats._meta.sorted_field_names},
     ).save()
 
     # TODO: What is this for?
