@@ -150,19 +150,21 @@ def update_user_self(user_data, key=None):
             "Leader",
             "Co-Leader",
         ):
-            try:
-                faction_position: typing.Optional[FactionPosition] = FactionPosition.get(
-                    (FactionPosition.name == user_data["faction"]["position"])
-                    & (FactionPosition.faction_tid == user_data["faction"]["faction_id"])
-                )
-            except DoesNotExist:
-                faction_position = None
-                user_data_kwargs["faction_position"] = None
+            faction_position: typing.Optional[FactionPosition] = FactionPosition.select().where(
+                (FactionPosition.name == user_data["faction"]["position"])
+                & (FactionPosition.faction_tid == user_data["faction"]["faction_id"])
+            ).first()
 
-            if faction_position is not None:
+            if faction_position is None:
+                user_data_kwargs["faction_position"] = None
+                user_data_kwargs["faction_aa"] = False
+            else:
                 user_data_kwargs["faction_position"] = faction_position
+                user_data_kwargs["faction_aa"] = faction_position.access_fac_api
     else:
         faction = None
+        user_data_kwargs["faction_position"] = faction_position
+        user_data_kwargs["faction_aa"] = False
 
     User.insert(
         tid=user_data["player_id"],
@@ -260,19 +262,21 @@ def update_user_other(user_data):
             "Leader",
             "Co-Leader",
         ):
-            try:
-                faction_position: typing.Optional[FactionPosition] = FactionPosition.get(
-                    (FactionPosition.name == user_data["faction"]["position"])
-                    & (FactionPosition.faction_tid == user_data["faction"]["faction_id"])
-                )
-            except DoesNotExist:
-                faction_position = None
-                user_data_kwargs["faction_position"] = None
+            faction_position: typing.Optional[FactionPosition] = FactionPosition.select().where(
+                (FactionPosition.name == user_data["faction"]["position"])
+                & (FactionPosition.faction_tid == user_data["faction"]["faction_id"])
+            ).first()
 
-            if faction_position is not None:
+            if faction_position is None:
+                user_data_kwargs["faction_position"] = None
+                user_data_kwargs["faction_aa"] = False
+            else:
                 user_data_kwargs["faction_position"] = faction_position
+                user_data_kwargs["faction_aa"] = faction_position.access_fac_api
     else:
         faction = None
+        user_data_kwargs["faction_position"] = None
+        user_data_kwargs["faction_aa"] = False
 
     User.insert(
         tid=user_data["player_id"],
