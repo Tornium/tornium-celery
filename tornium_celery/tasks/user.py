@@ -52,25 +52,27 @@ def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, r
 
     user: typing.Optional[User]
     if tid != 0:
-        try:
-            user_exists = User.select(User.tid).where(User.tid == tid).exists()
-        except DoesNotExist:
-            user_exists = False
+        user = User.select(User.last_refresh).where(User.tid == tid).first()
+        user_exists = user is not None
+
+        if user is not None and user.last_refresh is not None and time.time() - user.last_refresh.timestamp() > 600:
+            return
 
         user_id = tid
     elif discordid == tid == 0:
-        try:
-            user = User.get(User.key == key)
-        except DoesNotExist:
-            user = None
+        user = User.select(User.last_refresh).where(User.key == key).first()
+
+        if user is not None and user.last_refresh is not None and time.time() - user.last_refresh.timestamp() > 600:
+            return
 
         user_id = 0
         update_self = True
     else:
-        try:
-            user_exists = User.select().where(User.discord_id == discordid).exists()
-        except DoesNotExist:
-            user_exists = False
+        user = User.select(User.last_refresh).where(User.tid == tid).first()
+        user_exists = user is not None
+
+        if user is not None and user.last_refresh is not None and time.time() - user.last_refresh.timestamp() > 600:
+            return
 
         user_id = discordid
 
