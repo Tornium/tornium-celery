@@ -214,7 +214,7 @@ def update_user_self(user_data, key=None):
         second=0,
     ).replace(tzinfo=datetime.timezone.utc)
 
-    PersonalStats(
+    PersonalStats.create(
         pstat_id=int(bin(user_data["player_id"] << 8), 2) + int(bin(int(now.timestamp())), 2),
         tid=user_data["player_id"],
         timestamp=now,
@@ -307,7 +307,7 @@ def update_user_other(user_data):
         .timestamp()
     )
 
-    PersonalStats(
+    PersonalStats.create(
         pstat_id=int(bin(user_data["player_id"] << 8), 2) + int(bin(now), 2),
         tid=user_data["player_id"],
         timestamp=datetime.datetime.utcnow(),
