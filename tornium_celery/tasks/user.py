@@ -199,6 +199,7 @@ def update_user_self(user_data, key=None):
             User.last_action,
             User.last_refresh,
             User.battlescore_update,
+            *(getattr(User, k) for k in user_data_kwargs.keys()),
         ],
     ).execute()
 
@@ -291,6 +292,7 @@ def update_user_other(user_data):
             User.status,
             User.last_action,
             User.last_refresh,
+            *(getattr(User, k) for k in user_data_kwargs.keys()),
         ],
     ).execute()
 
