@@ -1046,7 +1046,9 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
             ],
         ).execute()
 
-        if oc_db.time_completed is not None:
+        if oc_db is None:
+            continue
+        elif oc_db.time_completed is not None:
             if (
                 OC_INITIATED and time.time() - oc_db.time_completed.timestamp() <= 299
             ):  # Prevents old OCs from being notified
