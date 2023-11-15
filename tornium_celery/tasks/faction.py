@@ -1024,9 +1024,9 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
             if oc_data["time_completed"] == 0
             else datetime.datetime.fromtimestamp(oc_data["time_completed"], tz=datetime.timezone.utc),
             planned_by=oc_data["planned_by"],
-            initiated_by=oc_data["initiated_by"],
-            money_gain=oc_data["money_gain"],
-            respect_gain=oc_data["respect_gain"],
+            initiated_by=oc_data["initiated_by"] if oc_data["initiated_by"] != 0 else None,
+            money_gain=oc_data["money_gain"] if oc_data["money_gain"] != 0 else None,
+            respect_gain=oc_data["respect_gain"] if oc_data["respect_gain"] != 0 else None,
             delayers=[],
         ).on_conflict(
             conflict_target=[OrganizedCrime.id],

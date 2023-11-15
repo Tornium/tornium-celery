@@ -147,7 +147,7 @@ def refresh_guilds():
 
     for deleted_guild in guilds_not_updated:
         try:
-            guild: Server = Server.select().get_by_id(Server.sid == deleted_guild).delete_instance()
+            guild: Server = Server.select().where(Server.sid == deleted_guild).delete_instance()
         except DoesNotExist:
             continue
 
