@@ -80,8 +80,9 @@ ATTACK_RESULTS = {
 def refresh_factions():
     faction: Faction
     for faction in Faction.select().join(Server):
-        aa_users = User.select().where((User.faction_aa == True) & (User.faction.is_null(False)))  # noqa: E712
+        aa_users = User.select().where((User.faction_aa == True) & (User.faction_id == faction.tid))  # noqa: E712
         keys = set()
+
 
         user: User
         for user in aa_users:
