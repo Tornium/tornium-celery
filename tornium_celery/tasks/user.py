@@ -30,6 +30,8 @@ from .api import tornget
 
 logger = get_task_logger("celery_app")
 
+MIN_USER_UPDATE = 600
+
 
 @celery.shared_task(
     name="tasks.user.update_user",
@@ -48,21 +50,28 @@ def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, r
 
     update_self = False
     user_exists = None
-    user = None
+    user: typing.Optional[User] = None
 
-    user: typing.Optional[User]
     if tid != 0:
         user = User.select(User.last_refresh).where(User.tid == tid).first()
         user_exists = user is not None
 
-        if user is not None and user.last_refresh is not None and time.time() - user.last_refresh.timestamp() > 600:
+        if (
+            user is not None
+            and user.last_refresh is not None
+            and time.time() - user.last_refresh.timestamp() <= MIN_USER_UPDATE
+        ):
             return
 
         user_id = tid
     elif discordid == tid == 0:
         user = User.select(User.last_refresh).where(User.key == key).first()
 
-        if user is not None and user.last_refresh is not None and time.time() - user.last_refresh.timestamp() > 600:
+        if (
+            user is not None
+            and user.last_refresh is not None
+            and time.time() - user.last_refresh.timestamp() <= MIN_USER_UPDATE
+        ):
             return
 
         user_id = 0
@@ -71,7 +80,11 @@ def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, r
         user = User.select(User.last_refresh).where(User.tid == tid).first()
         user_exists = user is not None
 
-        if user is not None and user.last_refresh is not None and time.time() - user.last_refresh.timestamp() > 600:
+        if (
+            user is not None
+            and user.last_refresh is not None
+            and time.time() - user.last_refresh.timestamp() <= MIN_USER_UPDATE
+        ):
             return
 
         user_id = discordid
