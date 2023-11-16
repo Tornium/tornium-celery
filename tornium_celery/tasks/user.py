@@ -326,17 +326,14 @@ def update_user_other(user_data):
     # TODO: Attach latest PersonalStats obj to User obj
 
     now: typing.Union[datetime.datetime, int] = datetime.datetime.utcnow()
-    now = int(
-        datetime.datetime(
-            year=now.year,
-            month=now.month,
-            day=now.day,
-            hour=now.hour,
-            minute=0,
-            second=0,
-        )
-        .replace(tzinfo=datetime.timezone.utc)
-    )
+    now = datetime.datetime(
+        year=now.year,
+        month=now.month,
+        day=now.day,
+        hour=now.hour,
+        minute=0,
+        second=0,
+    ).replace(tzinfo=datetime.timezone.utc)
 
     try:
         PersonalStats.create(
