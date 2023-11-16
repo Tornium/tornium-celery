@@ -1030,7 +1030,7 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
             respect_gain=oc_data["respect_gain"] if oc_data["respect_gain"] != 0 else None,
             delayers=[],
         ).on_conflict(
-            conflict_target=[OrganizedCrime.id],
+            conflict_target=[OrganizedCrime.oc_id],
             preserve=[
                 OrganizedCrime.faction_tid,
                 OrganizedCrime.crime_id,
