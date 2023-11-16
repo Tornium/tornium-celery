@@ -336,12 +336,11 @@ def update_user_other(user_data):
             second=0,
         )
         .replace(tzinfo=datetime.timezone.utc)
-        .timestamp()
     )
 
     try:
         PersonalStats.create(
-            pstat_id=int(bin(user_data["player_id"] << 8), 2) + int(bin(now), 2),
+            pstat_id=int(bin(user_data["player_id"] << 8), 2) + int(bin(int(now.timestamp())), 2),
             tid=user_data["player_id"],
             timestamp=now,
             **{k: v for k, v in user_data["personalstats"].items() if k in PersonalStats._meta.sorted_field_names},
