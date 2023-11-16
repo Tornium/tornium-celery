@@ -330,7 +330,7 @@ def update_user_other(user_data):
         PersonalStats.create(
             pstat_id=int(bin(user_data["player_id"] << 8), 2) + int(bin(now), 2),
             tid=user_data["player_id"],
-            timestamp=datetime.datetime.utcnow(),
+            timestamp=now,
             **{k: v for k, v in user_data["personalstats"].items() if k in PersonalStats._meta.sorted_field_names},
         )
     except IntegrityError:
