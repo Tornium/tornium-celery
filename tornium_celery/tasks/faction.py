@@ -711,7 +711,7 @@ def retal_attacks(faction_data, last_attacks=None):
                         },
                         {
                             "name": "Stat Score Update",
-                            "value": f"<t:{stat.time_added.timestamp()}:R>",
+                            "value": f"<t:{int(stat.time_added.timestamp())}:R>",
                             "inline": True,
                         },
                     )
@@ -811,7 +811,9 @@ def stat_db_attacks(faction_data, last_attacks=None):
     except (KeyError, DoesNotExist):
         return
 
-    if not faction.stats_db_enabled:
+    if (
+        not faction.stats_db_enabled
+    ):  # TODO: Switch to tasks.user.stat_db_attacks when factioin is disabled for users that are signed in
         return
 
     if last_attacks is None or last_attacks >= int(time.time()):
@@ -853,65 +855,65 @@ def stat_db_attacks(faction_data, last_attacks=None):
             elif attack["respect"] == 0:  # Attack by fac member
                 continue
 
-            user: typing.Optional[User] = User.select().where(User.tid == attack["defender_id"]).first()
-            user_id = attack["defender_id"]
+            user: typing.Optional[User] = (
+                User.select(User.battlescore, User.battlescore_update, User.faction)
+                .where(User.tid == attack["defender_id"])
+                .first()
+            )
 
-            if user is None or user.battlescore == 0:
+            if user is None or user.battlescore in (None, 0):
                 continue
             elif (
-                user.battlescore_update is None or time.time() - user.battlescore_update.timestamp() > 259200
+                user.battlescore_update is None or int(time.time()) - user.battlescore_update.timestamp() > 259200
             ):  # Three days
                 continue
 
-            user_score = user.battlescore
-
-            opponent: typing.Optional[User] = User.select().where(User.tid == attack["attacker_id"]).first()
             opponent_id = attack["attacker_id"]
 
-            if opponent is None:
-                opponent = User(
-                    tid=attack["attacker_id"],
-                    name=attack["attacker_name"],
-                    faction=attack["attacker_faction"],
-                )
-                opponent.save()
+            User.insert(
+                tid=attack["attacker_id"],
+                name=attack["attacker_name"],
+                faction=attack["attacker_faction"],
+            ).on_conflict(
+                conflict_target=[User.tid],
+                preserve=[User.name, User.faction],
+            ).execute()
         else:  # User is the attacker
-            user: typing.Optional[User] = User.select().where(User.tid == attack["attacker_id"]).first()
-            user_id = attack["attacker_id"]
+            user: typing.Optional[User] = (
+                User.select(User.battlescore, User.battlescore_update, User.faction)
+                .where(User.tid == attack["attacker_id"])
+                .first()
+            )
 
-            if user is None or user.battlescore == 0:
+            if user is None or user.battlescore in (None, 0):
                 continue
             elif (
-                user.battlescore_update is None or time.time() - user.battlescore_update.timestamp() > 259200
+                user.battlescore_update is None or int(time.time()) - user.battlescore_update.timestamp() > 259200
             ):  # Three days
                 continue
 
-            user_score = user.battlescore
-
-            opponent: typing.Optional[User] = User.select().where(User.tid == attack["defender_id"]).first()
             opponent_id = attack["defender_id"]
 
-            if opponent is None:
-                opponent = User(
-                    tid=attack["defender_id"],
-                    name=attack["defender_name"],
-                    faction=attack["defender_faction"],
-                )
-                opponent.save()
+            User.insert(
+                tid=attack["defender_id"],
+                name=attack["defender_name"],
+                faction=attack["defender_faction"],
+            ).on_conflict(
+                conflict_target=[User.tid],
+                preserve=[User.name, User.faction],
+            ).execute()
 
         try:
             update_user.delay(tid=opponent_id, key=random.choice(faction.aa_keys)).forget()
-        except (TornError, NetworkingError):
-            continue
         except Exception as e:
             logger.exception(e)
             continue
 
         try:
             if attack["defender_faction"] == faction_data["ID"]:
-                opponent_score = user_score / ((attack["modifiers"]["fair_fight"] - 1) * 0.375)
+                opponent_score = user.battlescore / ((attack["modifiers"]["fair_fight"] - 1) * 0.375)
             else:
-                opponent_score = (attack["modifiers"]["fair_fight"] - 1) * 0.375 * user_score
+                opponent_score = (attack["modifiers"]["fair_fight"] - 1) * 0.375 * user.battlescore
         except DivisionByZero:
             continue
 
@@ -919,13 +921,12 @@ def stat_db_attacks(faction_data, last_attacks=None):
             continue
 
         try:
-            stat_entry = Stat(
+            Stat.create(
                 tid=opponent_id,
                 battlescore=opponent_score,
                 time_added=datetime.datetime.fromtimestamp(attack["timestamp_ended"], tz=datetime.timezone.utc),
                 added_group=0 if faction.stats_db_global else user.faction_id,
             )
-            stat_entry.save()
         except Exception as e:
             logger.exception(e)
             continue
