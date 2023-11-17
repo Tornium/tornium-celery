@@ -1270,7 +1270,7 @@ def auto_cancel_requests():
             continue
 
         try:
-            faction: Faction = Faction.select(Faction.guild).where(Faction.tid == withdrawal.faction_tid)
+            faction: Faction = Faction.select(Faction.guild).join(Server).where(Faction.tid == withdrawal.faction_tid)
         except DoesNotExist:
             continue
 
