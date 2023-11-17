@@ -897,7 +897,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
             User.insert(
                 tid=attack["defender_id"],
                 name=attack["defender_name"],
-                faction=attack["defender_faction"] if attack["attacker_faction"] != 0 else None,
+                faction=attack["defender_faction"] if attack["defender_faction"] != 0 else None,
             ).on_conflict(
                 conflict_target=[User.tid],
                 preserve=[User.name, User.faction],
