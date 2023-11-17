@@ -873,7 +873,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
             User.insert(
                 tid=attack["attacker_id"],
                 name=attack["attacker_name"],
-                faction=attack["attacker_faction"],
+                faction=attack["attacker_faction"] if attack["attacker_faction"] != 0 else None,
             ).on_conflict(
                 conflict_target=[User.tid],
                 preserve=[User.name, User.faction],
@@ -897,7 +897,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
             User.insert(
                 tid=attack["defender_id"],
                 name=attack["defender_name"],
-                faction=attack["defender_faction"],
+                faction=attack["defender_faction"] if attack["attacker_faction"] != 0 else None,
             ).on_conflict(
                 conflict_target=[User.tid],
                 preserve=[User.name, User.faction],
