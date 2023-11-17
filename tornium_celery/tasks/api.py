@@ -93,17 +93,21 @@ def tornget(
 
     redis_client = rds()
     redis_key = f"tornium:torn-ratelimit:{key}"
+    ttl = 60 - datetime.datetime.utcnow().second
 
-    redis_client.set(redis_key, 50, nx=True, ex=60 - datetime.datetime.utcnow().second)
+    redis_client.set(redis_key, 50, nx=True, ex=ttl)
 
     try:
         if int(redis_client.get(redis_key)) > 0:
             redis_client.decrby(redis_key, 1)
+            redis_client.expire(redis_key, ttl, nx=True)
         else:
-            # redis_client.set(redis_key, 1, ex=60 - datetime.datetime.utcnow().second)
+            if redis_client.ttl(redis_key) == -1:
+                redis_client.set(redis_key, 1, ex=ttl)
+
             raise RatelimitError
     except TypeError:
-        redis_client.set(redis_key, 50, nx=True, ex=60 - datetime.datetime.utcnow().second)
+        redis_client.set(redis_key, 50, nx=True, ex=ttl)
 
     try:
         if session is None:
