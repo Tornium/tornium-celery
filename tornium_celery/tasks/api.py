@@ -32,6 +32,7 @@ from tornium_commons.errors import (
     RatelimitError,
     TornError,
 )
+from tornium_commons.models import User
 
 from .misc import remove_key_error
 
@@ -89,6 +90,8 @@ def tornget(
     )
 
     if key is None or key == "":
+        User.update(key=None).where(User.key == "").execute()
+        
         raise MissingKeyError
 
     redis_client = rds()

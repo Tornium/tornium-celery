@@ -66,7 +66,7 @@ def remove_key_error(key: str, error: int):
             except ValueError:
                 pass
     elif error in (2, 10, 13):
-        user.key = ""
+        user.key = None 
         user.save()
 
         if user.faction is not None:
