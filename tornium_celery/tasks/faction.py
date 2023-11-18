@@ -105,6 +105,8 @@ def refresh_factions():
         else:
             aa_keys = faction.aa_keys
 
+        aa_keys = [k for k in aa_keys if k in (None, "")]
+
         tornget.signature(
             kwargs={
                 "endpoint": "faction/?selections=basic,positions",
