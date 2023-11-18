@@ -356,7 +356,7 @@ def update_faction_positions(faction_positions_data: dict) -> typing.Optional[di
             access_fac_api=bool(perms["canAccessFactionApi"]),
             give_item=bool(perms["canGiveItem"]),
             give_money=bool(perms["canGiveMoney"]),
-            give_points=bool(perms["canGivePoitns"]),
+            give_points=bool(perms["canGivePoints"]),
             manage_forums=bool(perms["canManageForum"]),
             manage_applications=bool(perms["canManageApplications"]),
             kick_members=bool(perms["canKickMembers"]),
