@@ -92,12 +92,12 @@ def refresh_factions():
         ).apply_async(expires=300, link=update_faction.s())
 
         ts_key = ""
-        leader: User = User.select(User.key).where(User.tid == faction.leader).first()
+        leader: User = User.select(User.key).where(User.tid == faction.leader_id).first()
 
         if leader is not None and leader.key != "":
             ts_key = leader.key
         else:
-            coleader: User = User.select(User.key).where(User.tid == faction.coleader).first()
+            coleader: User = User.select(User.key).where(User.tid == faction.coleader_id).first()
 
             if coleader is not None and coleader.key != "":
                 ts_key = coleader.key
@@ -835,9 +835,7 @@ def retal_attacks(faction_data, last_attacks=None):
     queue="quick",
 )
 def stat_db_attacks(faction_data, last_attacks=None):
-    if "attacks" not in faction_data:
-        return
-    elif len(faction_data["attacks"]) == 0:
+    if len(faction_data.get("attacks", [])) == 0:
         return
 
     try:
@@ -875,7 +873,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
             21,
         ]:  # Checks if NPC fight (and you defeated NPC)
             continue
-        elif 1 < attack["modifiers"]["fair_fight"] < 3:  # 3x FF can be greater than the defender battlescore indicated
+        elif attack["modifiers"]["fair_fight"] in (1, 3):  # 3x FF can be greater than the defender battlescore indicated
             continue
         elif attack["timestamp_ended"] <= last_attacks:
             continue
