@@ -95,7 +95,7 @@ def refresh_factions():
                 {
                     u.key
                     for u in User.select(User.key, User.faction_aa).where(
-                        (User.faction_id == faction_data["ID"]) & (User.faction_aa == True)  # noqa 712
+                        (User.faction_id == faction.tid) & (User.faction_aa == True)  # noqa 712
                     )
                 }
             )
