@@ -79,14 +79,17 @@ ATTACK_RESULTS = {
 )
 def refresh_factions():
     faction: Faction
-    for faction in Faction.select().join(Server, User):
+    for faction in Faction.select().join(Server):
+        leader: typing.Optional[User] = User.select(User.key).where(User.tid == faction.leader_id).first()
+        coleader: typing.Optional[User] = User.select(User.key).where(User.tid == faction.coleader_id).first()
+
         if len(faction.aa_keys) == 0:
             aa_keys: typing.Set[str] = set()
 
-            if faction.leader is not None and faction.leader.key not in (None, ""):
-                aa_keys.add(faction.leader.key)
-            if faction.coleader is not None and faction.coleader.key not in (None, ""):
-                aa_keys.add(faction.coleader.key)
+            if leader is not None and leader.key not in (None, ""):
+                aa_keys.add(leader.key)
+            if coleader is not None and coleader.key not in (None, ""):
+                aa_keys.add(coleader.key)
 
             aa_keys = aa_keys.union(
                 {
@@ -110,11 +113,11 @@ def refresh_factions():
 
         ts_key = ""
 
-        if faction.leader is not None and faction.leader.key not in ("", None):
-            ts_key = faction.leader.key
+        if leader is not None and leader.key not in ("", None):
+            ts_key = leader.key
         else:
-            if faction.coleader is not None and faction.coleader.key not in ("", None):
-                ts_key = faction.coleader.key
+            if coleader is not None and coleader.key not in ("", None):
+                ts_key = coleader.key
 
         if ts_key != "":
             torn_stats_get.signature(
