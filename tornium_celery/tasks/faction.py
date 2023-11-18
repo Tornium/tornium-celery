@@ -79,28 +79,42 @@ ATTACK_RESULTS = {
 )
 def refresh_factions():
     faction: Faction
-    for faction in Faction.select().join(Server):
+    for faction in Faction.select().join(Server, User):
         if len(faction.aa_keys) == 0:
-            continue
+            aa_keys: typing.Set[str] = set()
+
+            if faction.leader is not None and faction.leader.key not in (None, ""):
+                aa_keys.add(faction.leader.key)
+            if faction.coleader is not None and faction.coleader.key not in (None, ""):
+                aa_keys.add(faction.coleader.key)
+
+            aa_keys = aa_keys.union(
+                {
+                    u.key
+                    for u in User.select(User.key, User.faction_aa).where(
+                        (User.faction_id == faction_data["ID"]) & (User.faction_aa == True)  # noqa 712
+                    )
+                }
+            )
+            Faction.update(aa_keys=list(aa_keys)).where(Faction.tid == faction.tid).execute()
+        else:
+            aa_keys = set(faction.aa_keys)
 
         tornget.signature(
             kwargs={
                 "endpoint": "faction/?selections=basic,positions",
-                "key": random.choice(faction.aa_keys),
+                "key": random.choice(aa_keys),
             },
             queue="api",
         ).apply_async(expires=300, link=update_faction.s())
 
         ts_key = ""
-        leader: User = User.select(User.key).where(User.tid == faction.leader_id).first()
 
-        if leader is not None and leader.key != "":
-            ts_key = leader.key
+        if faction.leader is not None and faction.leader.key not in ("", None):
+            ts_key = faction.leader.key
         else:
-            coleader: User = User.select(User.key).where(User.tid == faction.coleader_id).first()
-
-            if coleader is not None and coleader.key != "":
-                ts_key = coleader.key
+            if faction.coleader is not None and faction.coleader.key not in ("", None):
+                ts_key = faction.coleader.key
 
         if ts_key != "":
             torn_stats_get.signature(
@@ -115,7 +129,7 @@ def refresh_factions():
                     kwargs={
                         "endpoint": "faction/?selections=basic,contributors",
                         "stat": "drugoverdoses",
-                        "key": random.choice(faction.aa_keys),
+                        "key": random.choice(aa_keys),
                     },
                     queue="api",
                 ).apply_async(
