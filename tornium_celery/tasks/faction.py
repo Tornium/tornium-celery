@@ -80,31 +80,13 @@ ATTACK_RESULTS = {
 def refresh_factions():
     faction: Faction
     for faction in Faction.select().join(Server):
-        aa_users = User.select().where((User.faction_aa == True) & (User.faction_id == faction.tid))  # noqa: E712
-        keys = set()
-
-        user: User
-        for user in aa_users:
-            if user.key in (None, ""):
-                if user.faction_aa:
-                    user.faction_aa = False
-                    user.save()
-
-                continue
-
-            keys.add(user.key)
-
-        keys = list(keys)
-        faction.aa_keys = keys
-        faction.save()
-
-        if len(keys) == 0:
+        if len(faction.aa_keys) == 0:
             continue
 
         tornget.signature(
             kwargs={
                 "endpoint": "faction/?selections=basic,positions",
-                "key": random.choice(keys),
+                "key": random.choice(faction.aa_keys),
             },
             queue="api",
         ).apply_async(expires=300, link=update_faction.s())
@@ -133,7 +115,7 @@ def refresh_factions():
                     kwargs={
                         "endpoint": "faction/?selections=basic,contributors",
                         "stat": "drugoverdoses",
-                        "key": random.choice(keys),
+                        "key": random.choice(faction.aa_keys),
                     },
                     queue="api",
                 ).apply_async(
@@ -182,110 +164,11 @@ def update_faction(faction_data):
 
     # faction/positions
     if "positions" in faction_data:
-        positions = FactionPosition.select().where(FactionPosition.faction_tid == faction_data["ID"])
-        positions_names = [position.name for position in positions]
-        positions_data = {
-            "Recruit": {
-                "uuid": None,
-                "aa": False,
-            },
-            "Leader": {
-                "uuid": None,
-                "aa": True,
-            },
-            "Co-leader": {
-                "uuid": None,
-                "aa": True,
-            },
-        }
+        positions_data = update_faction_positions(faction_data)
 
-        position: FactionPosition
-        for position in positions:
-            if (
-                position.name not in ("Leader", "Co-leader", "Recruit")
-                and position.name not in faction_data["positions"].keys()
-            ):
-                positions_names.remove(position.name)
-                position.delete_instance()
-                continue
-
-            position_perms = faction_data["positions"][position.name]
-            positions_data[position.name] = {
-                "uuid": position.pid,
-                "aa": bool(faction_data["positions"][position.name]["canAccessFactionApi"]),
-            }
-
-            position.default = bool(position_perms["default"])
-            position.use_medical_item = bool(position_perms["canUseMedicalItem"])
-            position.use_booster_item = bool(position_perms["canUseBoosterItem"])
-            position.use_drug_item = bool(position_perms["canUseDrugItem"])
-            position.use_energy_refill = bool(position_perms["canUseEnergyRefill"])
-            position.use_nerve_refill = bool(position_perms["canUseNerveRefill"])
-            position.loan_temporary_item = bool(position_perms["canLoanTemporaryItem"])
-            position.loan_weapon_armory = bool(position_perms["canLoanWeaponAndArmory"])
-            position.retrieve_loaned_armory = bool(position_perms["canRetrieveLoanedArmory"])
-            position.plan_init_oc = bool(position_perms["canPlanAndInitiateOrganisedCrime"])
-            position.access_fac_api = bool(position_perms["canAccessFactionApi"])
-            position.give_item = bool(position_perms["canGiveItem"])
-            position.give_money = bool(position_perms["canGiveMoney"])
-            position.give_points = bool(position_perms["canGivePoints"])
-            position.manage_forums = bool(position_perms["canManageForum"])
-            position.manage_applications = bool(position_perms["canManageApplications"])
-            position.kick_members = bool(position_perms["canKickMembers"])
-            position.adjust_balances = bool(position_perms["canAdjustMemberBalance"])
-            position.manage_wars = bool(position_perms["canManageWars"])
-            position.manage_upgrades = bool(position_perms["canManageUpgrades"])
-            position.send_newsletters = bool(position_perms["canSendNewsletter"])
-            position.change_announcement = bool(position_perms["canChangeAnnouncement"])
-            position.change_description = bool(position_perms["canChangeDescription"])
-            position.save()
-
-        for position_name, position_data in faction_data["positions"].items():
-            if position_name in positions_names:
-                continue
-
-            position = FactionPosition(
-                pid=uuid.uuid4().hex,
-                name=position_name,
-                factiontid=faction_data["ID"],
-            )
-
-            position_perms = faction_data["positions"][position.name]
-            positions_data[position.name] = {
-                "uuid": position.pid,
-                "aa": bool(faction_data["positions"][position.name]["canAccessFactionApi"]),
-            }
-
-            position.default = bool(position_perms["default"])
-            position.use_medical_item = bool(position_perms["canUseMedicalItem"])
-            position.use_booster_item = bool(position_perms["canUseBoosterItem"])
-            position.use_drug_item = bool(position_perms["canUseDrugItem"])
-            position.use_energy_refill = bool(position_perms["canUseEnergyRefill"])
-            position.use_nerve_refill = bool(position_perms["canUseNerveRefill"])
-            position.loan_temporary_item = bool(position_perms["canLoanTemporaryItem"])
-            position.loan_weapon_armory = bool(position_perms["canLoanWeaponAndArmory"])
-            position.retrieve_loaned_armory = bool(position_perms["canRetrieveLoanedArmory"])
-            position.plan_init_oc = bool(position_perms["canPlanAndInitiateOrganisedCrime"])
-            position.access_fac_api = bool(position_perms["canAccessFactionApi"])
-            position.give_item = bool(position_perms["canGiveItem"])
-            position.give_money = bool(position_perms["canGiveMoney"])
-            position.give_points = bool(position_perms["canGivePoints"])
-            position.manage_forums = bool(position_perms["canManageForum"])
-            position.manage_applications = bool(position_perms["canManageApplications"])
-            position.kick_members = bool(position_perms["canKickMembers"])
-            position.adjust_balances = bool(position_perms["canAdjustMemberBalance"])
-            position.manage_wars = bool(position_perms["canManageWars"])
-            position.manage_upgrades = bool(position_perms["canManageUpgrades"])
-            position.send_newsletters = bool(position_perms["canSendNewsletter"])
-            position.change_announcement = bool(position_perms["canChangeAnnouncement"])
-            position.change_description = bool(position_perms["canChangeDescription"])
-            position.save()
-
-    users = []
+    users = [member_id for member_id in faction_data["members"].keys()]
 
     for member_id, member in faction_data["members"].items():
-        users.append(int(member_id))
-
         if "positions" in faction_data:
             User.insert(
                 tid=int(member_id),
@@ -334,18 +217,169 @@ def update_faction(faction_data):
                 ],
             ).execute()
 
-    for user in (
-        User.select(User.tid, User.faction, User.faction_position, User.faction_aa)
-        .join(Faction)
-        .where(User.faction.tid == faction_data["ID"])
-    ):
-        if user.tid in users:
+    leader: typing.Optional[User] = User.select(User.key).where(User.tid == faction_data["leader"]).first()
+    coleader: typing.Optional[User] = User.select(User.key).where(User.tid == faction_data["co-leader"]).first()
+    aa_keys: typing.Set[str] = set()
+
+    if leader is not None and leader.key not in (None, ""):
+        aa_keys.add(leader.key)
+    if coleader is not None and coleader.key not in (None, ""):
+        aa_keys.add(coleader.key)
+
+    aa_keys = aa_keys.union(
+        {
+            u.key
+            for u in User.select(User.key, User.faction_aa).where(
+                (User.faction_id == faction_data["ID"]) & (User.faction_aa == True)  # noqa 712
+            )
+        }
+    )
+    Faction.update(aa_keys=list(aa_keys)).where(Faction.tid == faction_data["ID"]).execute()
+
+    # Strips old faction members of their faction data
+    User.update(faction=None, faction_position=None, faction_aa=False).where(
+        (User.faction_id == faction_data["ID"]) & (User.tid.not_in(users))
+    ).execute()
+
+
+@celery.shared_task(
+    name="tasks.faction.update_faction_positions",
+    routing_key="quick.update_faction_positions",
+    queue="quick",
+)
+def update_faction_positions(faction_positions_data: dict) -> typing.Optional[dict]:
+    if "positions" not in faction_positions_data or "ID" not in faction_positions_data:
+        return None
+
+    existing_positions = FactionPosition.select(FactionPosition.pid, FactionPosition.name).where(
+        FactionPosition.faction_tid == faction_positions_data["ID"]
+    )
+    existing_position_names: typing.Set[str] = {position.name for position in existing_positions}
+
+    latest_position_names: typing.Set[str] = {k for k in faction_positions_data["positions"]}
+
+    positions_data = {
+        "Recruit": {
+            "uuid": None,
+            "aa": False,
+        },
+        "Leader": {
+            "uuid": None,
+            "aa": True,
+        },
+        "Co-leader": {
+            "uuid": None,
+            "aa": True,
+        },
+    }
+
+    deleted_position_name: str
+    for deleted_position_name in existing_position_names - latest_position_names:
+        try:
+            existing_positions.where(FactionPosition.name == deleted_position_name).delete_instance()
+        except Exception as e:
+            logger.exception(e)
             continue
 
-        user.faction = None
-        user.faction_position = None
-        user.faction_aa = False
-        user.save()
+        existing_position_names.remove(deleted_position_name)
+
+    add_position_name: str
+    for add_position_name in latest_position_names - existing_position_names:
+        perms = faction_positions_data["positions"][add_position_name]
+        pid = uuid.uuid4().hex
+
+        FactionPosition.insert(
+            pid=pid,
+            name=add_position_name,
+            faction_tid=faction_positions_data["ID"],
+            default=bool(perms["default"]),
+            use_medical_item=bool(perms["canUseMedicalItem"]),
+            use_booster_item=bool(perms["canUseBoosterItem"]),
+            use_drug_item=bool(perms["canUseDrugItem"]),
+            use_energy_refill=bool(perms["canUseEnergyRefill"]),
+            use_nerve_refill=bool(perms["canUseNerveRefill"]),
+            loan_temporary_item=bool(perms["canLoanTemporaryItem"]),
+            loan_weapon_armory=bool(perms["canLoanWeaponAndArmory"]),
+            retrieve_loaned_armory=bool(perms["canRetrieveLoanedArmory"]),
+            plan_init_oc=bool(perms["canPlanAndInitiateOrganisedCrime"]),
+            access_fac_api=bool(perms["canAccessFactionApi"]),
+            give_item=bool(perms["canGiveItem"]),
+            give_money=bool(perms["canGiveMoney"]),
+            give_points=bool(perms["canGivePoitns"]),
+            manage_forums=bool(perms["canManageForum"]),
+            manage_applications=bool(perms["canManageApplications"]),
+            kick_members=bool(perms["canKickMembers"]),
+            adjust_balances=bool(perms["canAdjustMemberBalance"]),
+            manage_wars=bool(perms["canManageWars"]),
+            manage_upgrades=bool(perms["canManageUpgrades"]),
+            send_newsletters=bool(perms["canSendNewsletter"]),
+            change_announcement=bool(perms["canChangeAnnouncement"]),
+            change_description=bool(perms["canChangeDescription"]),
+        ).on_conlict(
+            conflict_target=[FactionPosition.pid],
+            preserve=[
+                getattr(FactionPosition, p)
+                for p in set(FactionPosition._meta.sorted_field_names) - {"pid", "name", "faction_tid"}
+            ],
+        ).execute()
+
+        existing_position_names.add(add_position_name)
+        positions_data[add_position_name] = {
+            "uuid": pid,
+            "aa": bool(perms["canAccessFactionApi"]),
+        }
+
+    modify_position_name: str
+    for modify_position_name in existing_position_names & latest_position_names:
+        perms = faction_positions_data["positions"][modify_position_name]
+        existing_position: typing.Optional[FactionPosition] = existing_positions.where(
+            FactionPosition.name == modify_position_name
+        ).first()
+
+        if existing_position is None:
+            continue
+
+        FactionPosition.insert(
+            pid=existing_position.pid,
+            name=modify_position_name,
+            faction_tid=faction_positions_data["ID"],
+            default=bool(perms["default"]),
+            use_medical_item=bool(perms["canUseMedicalItem"]),
+            use_booster_item=bool(perms["canUseBoosterItem"]),
+            use_drug_item=bool(perms["canUseDrugItem"]),
+            use_energy_refill=bool(perms["canUseEnergyRefill"]),
+            use_nerve_refill=bool(perms["canUseNerveRefill"]),
+            loan_temporary_item=bool(perms["canLoanTemporaryItem"]),
+            loan_weapon_armory=bool(perms["canLoanWeaponAndArmory"]),
+            retrieve_loaned_armory=bool(perms["canRetrieveLoanedArmory"]),
+            plan_init_oc=bool(perms["canPlanAndInitiateOrganisedCrime"]),
+            access_fac_api=bool(perms["canAccessFactionApi"]),
+            give_item=bool(perms["canGiveItem"]),
+            give_money=bool(perms["canGiveMoney"]),
+            give_points=bool(perms["canGivePoitns"]),
+            manage_forums=bool(perms["canManageForum"]),
+            manage_applications=bool(perms["canManageApplications"]),
+            kick_members=bool(perms["canKickMembers"]),
+            adjust_balances=bool(perms["canAdjustMemberBalance"]),
+            manage_wars=bool(perms["canManageWars"]),
+            manage_upgrades=bool(perms["canManageUpgrades"]),
+            send_newsletters=bool(perms["canSendNewsletter"]),
+            change_announcement=bool(perms["canChangeAnnouncement"]),
+            change_description=bool(perms["canChangeDescription"]),
+        ).on_conlict(
+            conflict_target=[FactionPosition.pid],
+            preserve=[
+                getattr(FactionPosition, p)
+                for p in set(FactionPosition._meta.sorted_field_names) - {"pid", "name", "faction_tid"}
+            ],
+        ).execute()
+
+        positions_data[modify_position_name] = {
+            "uuid": existing_position.pid,
+            "aa": bool(perms["canAccessFactionApi"]),
+        }
+
+    return positions_data
 
 
 @celery.shared_task(

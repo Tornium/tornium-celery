@@ -27,6 +27,7 @@ from tornium_commons.errors import MissingKeyError
 from tornium_commons.models import Faction, FactionPosition, PersonalStats, Stat, User
 
 from .api import tornget
+from .faction import update_faction_positions
 
 logger = get_task_logger("celery_app")
 
@@ -153,6 +154,18 @@ def update_user_self(user_data, key=None):
             )
             .execute()
         )
+
+        if key is not None:
+            faction = Faction.select(Faction.aa_keys).where(Faction.tid == user_data["faction"]["faction_id"]).first()
+
+            if faction is not None and len(faction.aa_keys) == 0:
+                tornget.signature(
+                    kwargs={
+                        "endpoint": "faction/?selections=basic,positions",
+                        "key": key,
+                    },
+                    queue="api",
+                ).apply_async(link=update_faction_positions.s())
 
         if user_data["faction"]["position"] in ("Leader", "Co-Leader"):
             user_data_kwargs["faction_position"] = None
