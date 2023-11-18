@@ -366,7 +366,7 @@ def update_faction_positions(faction_positions_data: dict) -> typing.Optional[di
             send_newsletters=bool(perms["canSendNewsletter"]),
             change_announcement=bool(perms["canChangeAnnouncement"]),
             change_description=bool(perms["canChangeDescription"]),
-        ).on_conlict(
+        ).on_conflict(
             conflict_target=[FactionPosition.pid],
             preserve=[
                 getattr(FactionPosition, p)
