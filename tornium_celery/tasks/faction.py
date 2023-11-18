@@ -100,8 +100,10 @@ def refresh_factions():
                 }
             )
             Faction.update(aa_keys=list(aa_keys)).where(Faction.tid == faction.tid).execute()
+
+            aa_keys = list(aa_keys)
         else:
-            aa_keys = set(faction.aa_keys)
+            aa_keys = faction.aa_keys
 
         tornget.signature(
             kwargs={
