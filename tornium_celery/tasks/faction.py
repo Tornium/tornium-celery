@@ -105,7 +105,10 @@ def refresh_factions():
         else:
             aa_keys = faction.aa_keys
 
-        aa_keys = [k for k in aa_keys if k in (None, "")]
+        aa_keys = [k for k in aa_keys if k not in (None, "")]
+
+        if len(aa_keys) == 0:
+            continue
 
         tornget.signature(
             kwargs={
