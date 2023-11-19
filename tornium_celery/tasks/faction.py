@@ -1370,7 +1370,7 @@ def auto_cancel_requests():
                                         "type": 2,
                                         "style": 5,
                                         "label": "Fulfill",
-                                        "url": f"https://tornium.com/faction/banking/fulfill/{withdrawal.wid}",
+                                        "url": f"https://tornium.com/faction/banking/fulfill/{withdrawal.guid}",
                                         "disabled": True,
                                     },
                                     {
