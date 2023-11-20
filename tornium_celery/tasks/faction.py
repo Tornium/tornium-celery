@@ -82,30 +82,26 @@ def refresh_factions():
     for faction in Faction.select().join(Server):
         leader: typing.Optional[User] = User.select(User.key).where(User.tid == faction.leader_id).first()
         coleader: typing.Optional[User] = User.select(User.key).where(User.tid == faction.coleader_id).first()
+        aa_keys: typing.Set[str] = set()
 
-        if len(faction.aa_keys) == 0:
-            aa_keys: typing.Set[str] = set()
+        if leader is not None and leader.key not in (None, ""):
+            aa_keys.add(leader.key)
+        if coleader is not None and coleader.key not in (None, ""):
+            aa_keys.add(coleader.key)
 
-            if leader is not None and leader.key not in (None, ""):
-                aa_keys.add(leader.key)
-            if coleader is not None and coleader.key not in (None, ""):
-                aa_keys.add(coleader.key)
-
-            aa_keys = aa_keys.union(
-                {
-                    u.key
-                    for u in User.select(User.key, User.faction_aa).where(
-                        (User.faction_id == faction.tid) & (User.faction_aa == True)  # noqa 712
-                    )
-                }
-            )
-            Faction.update(aa_keys=list(aa_keys)).where(Faction.tid == faction.tid).execute()
-
-            aa_keys = list(aa_keys)
-        else:
-            aa_keys = faction.aa_keys
-
+        aa_keys = aa_keys.union(
+            {
+                u.key
+                for u in User.select(User.key, User.faction_aa).where(
+                    (User.key.is_null(False))
+                    & (User.key != "")
+                    & (User.faction_id == faction.tid)
+                    & (User.faction_aa == True)  # noqa 712
+                )
+            }
+        )
         aa_keys = [k for k in aa_keys if k not in (None, "")]
+        Faction.update(aa_keys=aa_keys).where(Faction.tid == faction.tid).execute()
 
         if len(aa_keys) == 0:
             continue
@@ -242,7 +238,11 @@ def update_faction(faction_data):
             ).execute()
 
     leader: typing.Optional[User] = User.select(User.key).where(User.tid == faction_data["leader"]).first()
-    coleader: typing.Optional[User] = User.select(User.key).where(User.tid == faction_data["co-leader"]).first()
+    coleader: typing.Optional[User] = (
+        User.select(User.key).where(User.tid == faction_data["co-leader"]).first()
+        if faction_data["co-leader"] != 0
+        else None
+    )
     aa_keys: typing.Set[str] = set()
 
     if leader is not None and leader.key not in (None, ""):
@@ -254,7 +254,10 @@ def update_faction(faction_data):
         {
             u.key
             for u in User.select(User.key, User.faction_aa).where(
-                (User.faction_id == faction_data["ID"]) & (User.faction_aa == True)  # noqa 712
+                (User.key.is_null(False))
+                & (User.key != "")
+                & (User.faction_id == faction_data["ID"])
+                & (User.faction_aa == True)  # noqa 712
             )
         }
     )
