@@ -31,12 +31,7 @@ from tornium_commons.formatters import (
     str_matches,
     torn_timestamp,
 )
-from tornium_commons.models import (
-    Faction,
-    Notification,
-    Server,
-    User,
-)
+from tornium_commons.models import Faction, Notification, Server, User
 from tornium_commons.skyutils import SKYNET_ERROR, SKYNET_GOOD, SKYNET_INFO
 
 from .api import discordpost, tornget

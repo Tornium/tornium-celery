@@ -23,7 +23,7 @@ from decimal import DivisionByZero
 
 import celery
 from celery.utils.log import get_task_logger
-from peewee import DoesNotExist
+from peewee import JOIN, DoesNotExist
 from tornium_commons import rds
 from tornium_commons.errors import DiscordError, NetworkingError, TornError
 from tornium_commons.formatters import commas, torn_timestamp
@@ -871,9 +871,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
     except (KeyError, DoesNotExist):
         return
 
-    if (
-        not faction.stats_db_enabled
-    ):  # TODO: Switch to tasks.user.stat_db_attacks when factioin is disabled for users that are signed in
+    if not faction.stats_db_enabled:
         return
 
     if last_attacks is None or last_attacks >= int(time.time()):
@@ -1087,8 +1085,8 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
     for oc_id, oc_data in oc_data["crimes"].items():
         oc_db: OrganizedCrime = (
             OrganizedCrime.select()
-            .join(User, on=OrganizedCrime.initiated_by)
-            .where((OrganizedCrime.faction_tid == faction.tid) & (OrganizedCrime.oc_id == oc_id))
+            .join(User, JOIN.LEFT_OUTER, on=OrganizedCrime.initiated_by)
+            .where(OrganizedCrime.oc_id == oc_id)
             .first()
         )
 

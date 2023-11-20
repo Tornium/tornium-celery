@@ -21,7 +21,7 @@ import typing
 import celery
 from celery.utils.log import get_task_logger
 from redis.commands.json.path import Path
-from tornium_commons import rds, db
+from tornium_commons import db, rds
 from tornium_commons.errors import DiscordError, NetworkingError, TornError
 from tornium_commons.formatters import commas, torn_timestamp
 from tornium_commons.models import Notification, Server, StockTick, User
