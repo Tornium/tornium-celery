@@ -23,7 +23,7 @@ import celery
 from celery.utils.log import get_task_logger
 from peewee import DoesNotExist, IntegrityError
 from tornium_commons import db, rds
-from tornium_commons.errors import MissingKeyError
+from tornium_commons.errors import MissingKeyError, NetworkingError, TornError
 from tornium_commons.models import Faction, FactionPosition, PersonalStats, Stat, User
 
 from .api import tornget
@@ -160,13 +160,16 @@ def update_user_self(user_data, key=None):
             if faction is not None and len(faction.aa_keys) == 0:
                 from .faction import update_faction_positions
 
-                tornget.signature(
-                    kwargs={
-                        "endpoint": "faction/?selections=basic,positions",
-                        "key": key,
-                    },
-                    queue="api",
-                ).apply_async(link=update_faction_positions.s())
+                try:
+                    positions_data = tornget("faction/?selections=basic,positions", key)
+                except TornError as e:
+                    if e.code == 7:
+                        user_data_kwargs["faction_aa"] = False
+                except NetworkingError:
+                    pass
+                else:
+                    user_data_kwargs["faction_aa"] = True
+                    update_faction_positions(positions_data)
 
         if user_data["faction"]["position"] in ("Leader", "Co-Leader"):
             user_data_kwargs["faction_position"] = None

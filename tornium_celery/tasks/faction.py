@@ -92,7 +92,7 @@ def refresh_factions():
         aa_keys = aa_keys.union(
             {
                 u.key
-                for u in User.select(User.key, User.faction_aa).where(
+                for u in User.select(User.key).where(
                     (User.key.is_null(False))
                     & (User.key != "")
                     & (User.faction_id == faction.tid)
@@ -129,7 +129,7 @@ def refresh_factions():
                 link=update_faction_ts.s(),
             )
 
-        if faction.od_channel != 0 and faction.guild is not None:
+        if faction.od_channel != 0 and faction.guild not in (None, 0):
             try:
                 tornget.signature(
                     kwargs={
@@ -253,7 +253,7 @@ def update_faction(faction_data):
     aa_keys = aa_keys.union(
         {
             u.key
-            for u in User.select(User.key, User.faction_aa).where(
+            for u in User.select(User.key).where(
                 (User.key.is_null(False))
                 & (User.key != "")
                 & (User.faction_id == faction_data["ID"])
@@ -261,6 +261,7 @@ def update_faction(faction_data):
             )
         }
     )
+    aa_keys = [k for k in aa_keys if k not in (None, "")]
     Faction.update(aa_keys=list(aa_keys)).where(Faction.tid == faction_data["ID"]).execute()
 
     # Strips old faction members of their faction data
@@ -1338,7 +1339,7 @@ def auto_cancel_requests():
     withdrawal: Withdrawal
     for withdrawal in Withdrawal.select().where(
         (Withdrawal.status == 0)
-        & (Withdrawal.time_requested >= datetime.datetime.utcnow() - datetime.timedelta(hours=2))
+        & (Withdrawal.time_requested <= datetime.datetime.utcnow() - datetime.timedelta(hours=1))
     ):  # Two hours before now
         withdrawal.status = 3
         withdrawal.time_fulfilled = datetime.datetime.utcnow()
