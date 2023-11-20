@@ -1340,10 +1340,8 @@ def auto_cancel_requests():
     for withdrawal in Withdrawal.select().where(
         (Withdrawal.status == 0)
         & (Withdrawal.time_requested <= datetime.datetime.utcnow() - datetime.timedelta(hours=1))
-    ):  # Two hours before now
-        withdrawal.status = 3
-        withdrawal.time_fulfilled = datetime.datetime.utcnow()
-        withdrawal.save()
+    ):  # One hour before now
+        Withdrawal.update(status=3, time_fulfilled=datetime.datetime.utcnow()).where(Withdrawal.wid == withdrawal.wid).execute()
 
         requester: typing.Optional[User] = User.select(User.discord_id).where(User.tid == withdrawal.requester).first()
 
