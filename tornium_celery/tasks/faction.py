@@ -897,7 +897,10 @@ def stat_db_attacks(faction_data, last_attacks=None):
             21,
         ]:  # Checks if NPC fight (and you defeated NPC)
             continue
-        elif attack["modifiers"]["fair_fight"] in (1, 3):  # 3x FF can be greater than the defender battlescore indicated
+        elif attack["modifiers"]["fair_fight"] in (
+            1,
+            3,
+        ):  # 3x FF can be greater than the defender battlescore indicated
             continue
         elif attack["timestamp_ended"] <= last_attacks:
             continue
@@ -926,6 +929,15 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
             opponent_id = attack["attacker_id"]
 
+            if attack["attacker_faction"] != 0:
+                Faction.insert(
+                    tid=attack["attacker_faction"],
+                    name=attack["attacker_factionname"],
+                ).on_conflict(
+                    conflict_target=[Faction.tid],
+                    preserve=[Faction.name],
+                ).execute()
+
             User.insert(
                 tid=attack["attacker_id"],
                 name=attack["attacker_name"],
@@ -949,6 +961,15 @@ def stat_db_attacks(faction_data, last_attacks=None):
                 continue
 
             opponent_id = attack["defender_id"]
+
+            if attack["defender_faction"] != 0:
+                Faction.insert(
+                    tid=attack["defender_faction"],
+                    name=attack["defender_factionname"],
+                ).on_conflict(
+                    conflict_target=[Faction.tid],
+                    preserve=[Faction.name],
+                ).execute()
 
             User.insert(
                 tid=attack["defender_id"],

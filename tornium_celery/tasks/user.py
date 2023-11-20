@@ -415,6 +415,8 @@ def fetch_attacks_user_runner():
 
     user: User
     for user in User.select().where((User.key.is_null(False)) & (User.key != "")):
+        if user.key in ("", None):
+            continue
         if user.faction_aa:
             continue
         if user.last_attacks is None:
@@ -507,6 +509,15 @@ def stat_db_attacks_user(user_data):
         # User: faction member
         # Opponent: non-faction member regardless of attack or defend
         if attack["attacker_id"] == user.tid:  # Attacker is user
+            if attack["defender_faction"] != 0:
+                Faction.insert(
+                    tid=attack["defender_faction"],
+                    name=attack["defender_factionname"],
+                ).on_conflict(
+                    conflict_target=[Faction.tid],
+                    preserve=[Faction.name],
+                ).execute()
+
             User.insert(
                 tid=attack["defender_id"],
                 name=attack["defender_name"],
@@ -522,6 +533,11 @@ def stat_db_attacks_user(user_data):
         else:  # Defender is user
             if attack["attacker_id"] in ("", 0):  # Attacker stealthed
                 continue
+
+            if attack["attacker_faction"] != 0:
+                Faction.insert(tid=attack["attacker_faction"], name=attack["attacker_factionname"]).on_conflict(
+                    conflict_target=[Faction.tid], preserve=[Faction.name]
+                ).execute()
 
             User.insert(
                 tid=attack["attacker_id"],
