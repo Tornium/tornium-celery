@@ -1012,7 +1012,8 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
     Faction.update(
         last_attacks=datetime.datetime.fromtimestamp(
-            list(faction_data["attacks"].values())[-1]["timestamp_ended"], tz=datetime.timezone.utc
+            list(faction_data["attacks"].values())[-1]["timestamp_ended"],
+            tz=datetime.timezone.utc,
         )
     ).where(Faction.tid == faction_data["ID"]).execute()
 
@@ -1182,8 +1183,6 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
 
         if OC_DELAY and len(oc_db.delayers) == 0 and not all(ready):
             # OC has been delayed
-            oc_db.notified = False
-
             payload = {
                 "embeds": [
                     {
@@ -1208,12 +1207,14 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
 
                 payload["content"] = roles_str
 
+            delayers = list(oc_db.delayers)
+
             for participant in oc_data["participants"]:
                 participant_id = list(participant.keys())[0]
                 participant = participant[participant_id]
 
                 if participant["color"] != "green":
-                    oc_db.delayers.append(participant_id)
+                    delayers.append(int(participant_id))
 
                     participant_db: typing.Optional[User] = (
                         User.select(User.discord_id).where(User.tid == participant_id).first()
@@ -1281,7 +1282,9 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
                             }
                         )
 
-            oc_db.save()
+            OrganizedCrime.update(delayers=delayers, notified=False).where(
+                OrganizedCrime.oc_id == oc_db.oc_id
+            ).execute()
 
             try:
                 discordpost.delay(
@@ -1293,8 +1296,7 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
                 continue
         elif OC_READY and not oc_db.notified and all(ready):
             # OC is ready
-            oc_db.notified = True
-            oc_db.save()
+            OrganizedCrime.update(notified=True).where(OrganizedCrime.oc_id == oc_db.oc_id).execute()
 
             payload = {
                 "embeds": [

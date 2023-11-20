@@ -57,7 +57,11 @@ def _get_stocks_tick(
     )
 
 
-@celery.shared_task(name="tasks.stocks.stocks_prefetch", routing_key="quick.stocks_prefetch", queue="quick")
+@celery.shared_task(
+    name="tasks.stocks.stocks_prefetch",
+    routing_key="quick.stocks_prefetch",
+    queue="quick",
+)
 def stocks_prefetch():
     stocks_timestamp = datetime.datetime.utcnow().replace(second=5, microsecond=0, tzinfo=datetime.timezone.utc)
     # TODO: Don't use ETA if the current time is past xx:xx:05
@@ -84,7 +88,11 @@ def stocks_prefetch():
     )
 
 
-@celery.shared_task(name="tasks.stocks.update_stock_prices", routing_key="quick.update_stock_prices", queue="quick")
+@celery.shared_task(
+    name="tasks.stocks.update_stock_prices",
+    routing_key="quick.update_stock_prices",
+    queue="quick",
+)
 def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datetime.datetime.utcnow()):
     if stocks_data is None:
         raise ValueError
@@ -115,7 +123,9 @@ def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datet
 
 
 @celery.shared_task(
-    name="tasks.stocks.stock_price_notifications", routing_key="default.stock_price_notifications", queue="default"
+    name="tasks.stocks.stock_price_notifications",
+    routing_key="default.stock_price_notifications",
+    queue="default",
 )
 def stock_price_notifications(stocks_data: dict):
     notification: Notification
@@ -187,7 +197,11 @@ def stock_price_notifications(stocks_data: dict):
             notification.delete_instance()
 
 
-@celery.shared_task(name="tasks.stocks.stock_notifications", routing_key="default.stock_notifications", queue="default")
+@celery.shared_task(
+    name="tasks.stocks.stock_notifications",
+    routing_key="default.stock_notifications",
+    queue="default",
+)
 def stock_notifications(stocks_data: dict, stocks_timestamp: datetime.datetime = datetime.datetime.utcnow()):
     return  # TODO: Rewrite
 
@@ -350,7 +364,11 @@ def stock_notifications(stocks_data: dict, stocks_timestamp: datetime.datetime =
             fourteen_min = fourteen_ticks.order_by("price").first().price
             month_min = month_ticks.order_by("price").first().price
 
-            redis_client.set(f"tornium:stocks:{stock_id}:min", f"{seven_min}|{fourteen_min}|{month_min}", ex=3600)
+            redis_client.set(
+                f"tornium:stocks:{stock_id}:min",
+                f"{seven_min}|{fourteen_min}|{month_min}",
+                ex=3600,
+            )
         else:
             seven_min, fourteen_min, month_min = [float(n) for n in price_min.split("|")]
 
@@ -437,7 +455,11 @@ def stock_notifications(stocks_data: dict, stocks_timestamp: datetime.datetime =
                 fourteen_max = fourteen_ticks.order_by("-price").first().price
                 month_max = month_ticks.order_by("-price").first().price
 
-                redis_client.set(f"tornium:stocks:{stock_id}:max", f"{seven_max}|{fourteen_max}|{month_max}", ex=3600)
+                redis_client.set(
+                    f"tornium:stocks:{stock_id}:max",
+                    f"{seven_max}|{fourteen_max}|{month_max}",
+                    ex=3600,
+                )
         else:
             seven_max, fourteen_max, month_max = [float(n) for n in price_max.split("|")]
 
