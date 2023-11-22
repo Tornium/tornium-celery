@@ -76,6 +76,7 @@ ATTACK_RESULTS = {
     name="tasks.faction.refresh_factions",
     routing_key="default.refresh_factions",
     queue="default",
+    time_limit=5,
 )
 def refresh_factions():
     faction: Faction
@@ -151,6 +152,7 @@ def refresh_factions():
     name="tasks.faction.update_faction",
     routing_key="quick.update_faction",
     queue="quick",
+    time_limit=5,
 )
 def update_faction(faction_data):
     if faction_data is None:
@@ -274,6 +276,7 @@ def update_faction(faction_data):
     name="tasks.faction.update_faction_positions",
     routing_key="quick.update_faction_positions",
     queue="quick",
+    time_limit=5,
 )
 def update_faction_positions(faction_positions_data: dict) -> typing.Optional[dict]:
     if "positions" not in faction_positions_data or "ID" not in faction_positions_data:
@@ -414,6 +417,7 @@ def update_faction_positions(faction_positions_data: dict) -> typing.Optional[di
     name="tasks.faction.update_faction_ts",
     routing_key="default.update_faction_ts",
     queue="default",
+    time_limit=5,
 )
 def update_faction_ts(faction_ts_data):
     if not faction_ts_data["status"]:
@@ -455,6 +459,7 @@ def update_faction_ts(faction_ts_data):
     name="tasks.faction.check_faction_ods",
     routing_key="quick.check_faction_ods",
     queue="quick",
+    time_limit=5,
 )
 def check_faction_ods(faction_od_data):
     try:
@@ -550,6 +555,7 @@ def check_faction_ods(faction_od_data):
     name="tasks.faction.fetch_attacks_runner",
     routing_key="quick.fetch_attacks_runner",
     queue="quick",
+    time_limit=5,
 )
 def fetch_attacks_runner():
     redis = rds()
@@ -607,7 +613,7 @@ def fetch_attacks_runner():
         )
 
 
-@celery.shared_task(name="tasks.faction.retal_attacks", routing_key="quick.retal_attacks", queue="quick")
+@celery.shared_task(name="tasks.faction.retal_attacks", routing_key="quick.retal_attacks", queue="quick", time_limit=5)
 def retal_attacks(faction_data, last_attacks=None):
     if "attacks" not in faction_data:
         return
@@ -861,6 +867,7 @@ def retal_attacks(faction_data, last_attacks=None):
     name="tasks.faction.stat_db_attacks",
     routing_key="quick.stat_db_attacks",
     queue="quick",
+    time_limit=5,
 )
 def stat_db_attacks(faction_data, last_attacks=None):
     if len(faction_data.get("attacks", [])) == 0:
@@ -1018,7 +1025,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
     ).where(Faction.tid == faction_data["ID"]).execute()
 
 
-@celery.shared_task(name="tasks.faction.oc_refresh", routing_key="quick.oc_refresh", queue="quick")
+@celery.shared_task(name="tasks.faction.oc_refresh", routing_key="quick.oc_refresh", queue="quick", time_limit=5)
 def oc_refresh():
     faction: Faction
     for faction in Faction.select().join(Server).where(Faction.aa_keys != []):
@@ -1049,6 +1056,7 @@ def oc_refresh():
     name="tasks.faction.oc_refresh_subtask",
     routing_key="default.oc_refresh_subtask",
     queue="default",
+    time_limit=5,
 )
 def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
     try:
@@ -1229,7 +1237,7 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
                                         "title": "OC Delayed",
                                         "description": f"You are currently delaying the "
                                         f"{ORGANIZED_CRIMES[oc_data['crime_id']]} that you are participating in which "
-                                        f"was ready <t:{oc_db.time_ready}:R>. Please return to Torn or otherwise "
+                                        f"was ready <t:{int(oc_db.time_ready.timestamp())}:R>. Please return to Torn or otherwise "
                                         f"become available for the OC to be initiated.",
                                         "timestamp": datetime.datetime.utcnow().isoformat(),
                                         "footer": {"text": f"#{oc_db.oc_id}"},
@@ -1334,6 +1342,7 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
     name="tasks.faction.auto_cancel_requests",
     routing_key="default.auto_cancel_requests",
     queue="default",
+    time_limit=5,
 )
 def auto_cancel_requests():
     withdrawal: Withdrawal
@@ -1341,7 +1350,9 @@ def auto_cancel_requests():
         (Withdrawal.status == 0)
         & (Withdrawal.time_requested <= datetime.datetime.utcnow() - datetime.timedelta(hours=1))
     ):  # One hour before now
-        Withdrawal.update(status=3, time_fulfilled=datetime.datetime.utcnow()).where(Withdrawal.wid == withdrawal.wid).execute()
+        Withdrawal.update(status=3, time_fulfilled=datetime.datetime.utcnow()).where(
+            Withdrawal.wid == withdrawal.wid
+        ).execute()
 
         requester: typing.Optional[User] = User.select(User.discord_id).where(User.tid == withdrawal.requester).first()
 
@@ -1444,7 +1455,7 @@ def auto_cancel_requests():
         ).forget()
 
 
-@celery.shared_task(name="tasks.faction.armory_check", routing_key="quick.armory_check", queue="quick")
+@celery.shared_task(name="tasks.faction.armory_check", routing_key="quick.armory_check", queue="quick", time_limit=5)
 def armory_check():
     faction: Faction
     for faction in (
@@ -1491,6 +1502,7 @@ def armory_check():
     name="tasks.faction.armory_check_subtask",
     routing_key="quick.armory_check_subtask",
     queue="quick",
+    time_limit=5,
 )
 def armory_check_subtask(_armory_data, faction_id: int):
     try:

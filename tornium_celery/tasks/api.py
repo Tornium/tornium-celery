@@ -74,7 +74,7 @@ def discord_ratelimit_pre(
     return bucket
 
 
-@celery.shared_task(name="tasks.api.tornget", time_limit=5, routing_key="api.tornget", queue="api")
+@celery.shared_task(name="tasks.api.tornget", time_limit=5, routing_key="api.tornget", queue="api", time_limit=10)
 def tornget(
     endpoint,
     key,
@@ -143,6 +143,7 @@ def tornget(
     max_retries=5,
     routing_key="api.discordget",
     queue="api",
+    time_limit=10,
 )
 def discordget(self: celery.Task, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
@@ -191,6 +192,7 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
     max_retries=5,
     routing_key="api.discordpatch",
     queue="api",
+    time_limit=10,
 )
 def discordpatch(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
@@ -247,6 +249,7 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
     max_retries=5,
     routing_key="api.discordpost",
     queue="api",
+    time_limit=10,
 )
 def discordpost(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
@@ -359,6 +362,7 @@ def discordput(self, endpoint, payload, *args, **kwargs):
     max_retries=5,
     routing_key="api.discorddelete",
     queue="api",
+    time_limit=5,
 )
 def discorddelete(self, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
@@ -409,6 +413,7 @@ def discorddelete(self, endpoint, *args, **kwargs):
     time_limit=15,
     routing_key="api.torn_stats_get",
     queue="api",
+    time_limit=20,
 )
 def torn_stats_get(endpoint, key, session=None):
     url = f"https://www.tornstats.com/api/v2/{key}/{endpoint}"

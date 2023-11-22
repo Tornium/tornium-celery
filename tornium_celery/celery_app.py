@@ -211,7 +211,7 @@ if celery_app is None:
         if task_data["schedule"]["type"] == "periodic":
             _s: typing.Union[int, str] = task_data["schedule"].get("second")
 
-            if _s is None or (type(_s) != int and not _s.isdigit()):
+            if _s is None or (not isinstance(_s, int) and not _s.isdigit()):
                 continue
 
             s = int(_s)

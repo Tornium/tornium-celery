@@ -41,6 +41,7 @@ logger: logging.Logger = get_task_logger("celery_app")
     name="tasks.guild.refresh_guilds",
     routing_key="default.refresh_guilds",
     queue="default",
+    time_limit=600,
 )
 def refresh_guilds():
     try:
@@ -154,7 +155,9 @@ def refresh_guilds():
         logger.info(f"Deleted {guild.name} [{guild.sid}] from database (Reason: not found by Discord API)")
 
 
-@celery.shared_task(name="tasks.guild.verify_users", routing_key="default.verify_users", queue="default")
+@celery.shared_task(
+    name="tasks.guild.verify_users", routing_key="default.verify_users", queue="default", time_limit=600
+)
 def verify_users(
     guild_id: int,
     admin_keys: typing.Optional[list] = None,
@@ -410,9 +413,7 @@ def verify_users(
 
 
 @celery.shared_task(
-    name="tasks.guild.verify_member_sub",
-    routing_key="quick.verify_member_sub",
-    queue="quick",
+    name="tasks.guild.verify_member_sub", routing_key="quick.verify_member_sub", queue="quick", time_limit=60
 )
 def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id: int):
     if "error" in user_data:

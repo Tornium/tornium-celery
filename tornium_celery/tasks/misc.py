@@ -21,7 +21,7 @@ from tornium_commons import rds
 from tornium_commons.models import Faction, User
 
 
-@celery.shared_task(name="tasks.misc.send_dm", routing_key="default.send_dm", queue="default")
+@celery.shared_task(name="tasks.misc.send_dm", routing_key="default.send_dm", queue="default", time_limit=5)
 def send_dm(discord_id: int, payload: dict):
     from .api import discordpost
 
@@ -45,6 +45,7 @@ def send_dm(discord_id: int, payload: dict):
     name="tasks.misc.remove_key_error",
     routing_key="quick.remove_key_error",
     queue="quick",
+    time_limit=5,
 )
 def remove_key_error(key: str, error: int):
     try:

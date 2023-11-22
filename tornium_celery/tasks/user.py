@@ -38,6 +38,7 @@ MIN_USER_UPDATE = 600
     routing_key="default.update_user",
     queue="default",
     bind=True,
+    time_limit=10,
 )
 def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, refresh_existing=True):
     # TODO: Change default values of tid and discordid to None
@@ -132,6 +133,7 @@ def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, r
     name="tasks.user.update_user_self",
     routing_key="quick.update_user_self",
     queue="quick",
+    time_limit=10,
 )
 def update_user_self(user_data, key=None):
     user_data_kwargs = {"faction_aa": False}
@@ -268,6 +270,7 @@ def update_user_self(user_data, key=None):
     name="tasks.user.update_user_other",
     routing_key="quick.update_user_other",
     queue="quick",
+    time_limit=5,
 )
 def update_user_other(user_data):
     user_data_kwargs = {"faction_aa": False}
@@ -376,6 +379,7 @@ def update_user_other(user_data):
     name="tasks.user.refresh_users",
     routing_key="default.refresh_users",
     queue="default",
+    time_limit=5,
 )
 def refresh_users():
     user: User
@@ -397,6 +401,7 @@ def refresh_users():
     name="tasks.user.fetch_attacks_user_runner",
     routing_key="quick.fetch_user_attacks",
     queue="quick",
+    time_limit=5,
 )
 def fetch_attacks_user_runner():
     redis = rds()
@@ -447,6 +452,7 @@ def fetch_attacks_user_runner():
     name="tasks.user.stat_db_attacks_user",
     routing_key="quick.stat_db_attacks_user",
     queue="quick",
+    time_limit=5,
 )
 def stat_db_attacks_user(user_data):
     if len(user_data.get("attacks", [])) == 0:

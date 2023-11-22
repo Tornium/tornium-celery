@@ -112,6 +112,7 @@ def first_landing(duration):
     name="tasks.stakeout_hooks.run_user_stakeouts",
     routing_key="quick.stakeouts.run_user",
     queue="quick",
+    time_limit=10,
 )
 def run_user_stakeouts():
     notification: Notification
@@ -153,6 +154,7 @@ def run_user_stakeouts():
     name="tasks.stakeout_hooks.user_hook",
     routing_key="quick.stakeouts.user_hook",
     queue="quick",
+    time_limit=10,
 )
 def user_hook(user_data, faction: typing.Optional[int] = None):
     if "player_id" not in user_data:
@@ -472,6 +474,7 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
     name="tasks.stakeout_hooks.run_faction_stakeouts",
     routing_key="quick.stakeouts.run_faction",
     queue="quick",
+    time_limit=10,
 )
 def run_faction_stakeouts():
     notifictation: Notification
@@ -520,6 +523,7 @@ def run_faction_stakeouts():
     name="tasks.stakeout_hooks.faction_hook",
     routing_key="quick.stakeouts.faction_hook",
     queue="quick",
+    time_limit=5,
 )
 def faction_hook(faction_data):
     if "ID" not in faction_data:

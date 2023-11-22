@@ -44,6 +44,7 @@ logger = get_task_logger("celery_app")
     name="tasks.items.update_items",
     routing_key="default.items.update_items",
     queue="default",
+    time_limit=15,
 )
 def update_items(items_data):
     Item.update_items(torn_get=tornget, key=User.random_key())
@@ -59,6 +60,7 @@ def update_items(items_data):
     name="tasks.items.fetch_market",
     routing_key="default.items.fetch_market",
     queue="default",
+    time_limit=15,
 )
 def fetch_market():
     notifications = Notification.select().where((Notification.n_type == 3) & (Notification.enabled == True))
@@ -106,6 +108,7 @@ def fetch_market():
     name="tasks.items.market_notifications",
     routing_key="default.items.market_notifications",
     queue="default",
+    time_limit=15,
 )
 def market_notifications(market_data: dict, notifications: dict):
     # TODO: Needs to be rewritten as relies on loading and dumping the model via JSON

@@ -61,6 +61,7 @@ def _get_stocks_tick(
     name="tasks.stocks.stocks_prefetch",
     routing_key="quick.stocks_prefetch",
     queue="quick",
+    time_limit=5,
 )
 def stocks_prefetch():
     stocks_timestamp = datetime.datetime.utcnow().replace(second=5, microsecond=0, tzinfo=datetime.timezone.utc)
@@ -92,6 +93,7 @@ def stocks_prefetch():
     name="tasks.stocks.update_stock_prices",
     routing_key="quick.update_stock_prices",
     queue="quick",
+    time_limit=5,
 )
 def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datetime.datetime.utcnow()):
     if stocks_data is None:
@@ -126,6 +128,7 @@ def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datet
     name="tasks.stocks.stock_price_notifications",
     routing_key="default.stock_price_notifications",
     queue="default",
+    time_limit=5,
 )
 def stock_price_notifications(stocks_data: dict):
     notification: Notification
@@ -201,6 +204,7 @@ def stock_price_notifications(stocks_data: dict):
     name="tasks.stocks.stock_notifications",
     routing_key="default.stock_notifications",
     queue="default",
+    time_limit=5,
 )
 def stock_notifications(stocks_data: dict, stocks_timestamp: datetime.datetime = datetime.datetime.utcnow()):
     return  # TODO: Rewrite
