@@ -413,7 +413,6 @@ def discorddelete(self, endpoint, *args, **kwargs):
     time_limit=15,
     routing_key="api.torn_stats_get",
     queue="api",
-    time_limit=20,
 )
 def torn_stats_get(endpoint, key, session=None):
     url = f"https://www.tornstats.com/api/v2/{key}/{endpoint}"
