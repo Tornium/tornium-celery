@@ -74,7 +74,7 @@ def discord_ratelimit_pre(
     return bucket
 
 
-@celery.shared_task(name="tasks.api.tornget", time_limit=5, routing_key="api.tornget", queue="api", time_limit=10)
+@celery.shared_task(name="tasks.api.tornget", time_limit=5, routing_key="api.tornget", queue="api")
 def tornget(
     endpoint,
     key,
