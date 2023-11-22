@@ -806,7 +806,7 @@ def retal_attacks(faction_data, last_attacks=None):
                     f"[{user.tid}] (-{attack['respect_loss']})",
                     "fields": fields,
                     "timestamp": datetime.datetime.utcnow().isoformat(),
-                    "footer": {"text": torn_timestamp(attack['timestamp_ended'])},
+                    "footer": {"text": torn_timestamp(attack["timestamp_ended"])},
                 }
             ],
             "components": [
@@ -1186,13 +1186,15 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
             continue
         elif oc_db.time_ready.timestamp() > int(time.time()):
             continue
+        elif next(iter(oc_data["participants"][0].values())) is None:
+            continue
 
         ready = list(
             map(
                 lambda participant: list(participant.values())[0].get("color") not in (None, "green"),
                 oc_data["participants"],
             )
-        ) if len(oc_data["participants"]) != 0 else []
+        )
 
         if OC_DELAY and len(oc_db.delayers) == 0 and not all(ready):
             # OC has been delayed
@@ -1296,9 +1298,7 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
                         )
 
             if len(delayers) != 0:
-                OrganizedCrime.update(delayers=delayers).where(
-                    OrganizedCrime.oc_id == oc_db.oc_id
-                ).execute()
+                OrganizedCrime.update(delayers=delayers).where(OrganizedCrime.oc_id == oc_db.oc_id).execute()
 
             try:
                 discordpost.delay(
