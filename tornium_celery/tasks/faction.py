@@ -806,7 +806,7 @@ def retal_attacks(faction_data, last_attacks=None):
                     f"[{user.tid}] (-{attack['respect_loss']})",
                     "fields": fields,
                     "timestamp": datetime.datetime.utcnow().isoformat(),
-                    "footer": {"text": torn_timestamp()},
+                    "footer": {"text": torn_timestamp(attack['timestamp_ended'])},
                 }
             ],
             "components": [
@@ -883,6 +883,13 @@ def stat_db_attacks(faction_data, last_attacks=None):
 
     if last_attacks is None or last_attacks >= int(time.time()):
         last_attacks = faction.last_attacks
+
+    Faction.update(
+        last_attacks=datetime.datetime.fromtimestamp(
+            list(faction_data["attacks"].values())[-1]["timestamp_ended"],
+            tz=datetime.timezone.utc,
+        )
+    ).where(Faction.tid == faction_data["ID"]).execute()
 
     attack: dict
     for attack in faction_data["attacks"].values():
@@ -1017,13 +1024,6 @@ def stat_db_attacks(faction_data, last_attacks=None):
             logger.exception(e)
             continue
 
-    Faction.update(
-        last_attacks=datetime.datetime.fromtimestamp(
-            list(faction_data["attacks"].values())[-1]["timestamp_ended"],
-            tz=datetime.timezone.utc,
-        )
-    ).where(Faction.tid == faction_data["ID"]).execute()
-
 
 @celery.shared_task(name="tasks.faction.oc_refresh", routing_key="quick.oc_refresh", queue="quick", time_limit=5)
 def oc_refresh():
@@ -1098,6 +1098,11 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
             .where(OrganizedCrime.oc_id == oc_id)
             .first()
         )
+
+        User.insert(tid=oc_data["planned_by"]).on_conflict_ignore().execute()
+
+        if oc_data["initiated_by"] != 0:
+            User.insert(tid=oc_data["initiated_by"]).on_conflict_ignore().execute()
 
         OrganizedCrime.insert(
             faction_tid=faction.tid,
@@ -1184,10 +1189,10 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
 
         ready = list(
             map(
-                lambda participant: list(participant.values())[0]["color"] == "green",
+                lambda participant: list(participant.values())[0].get("color") not in (None, "green"),
                 oc_data["participants"],
             )
-        )
+        ) if len(oc_data["participants"]) != 0 else []
 
         if OC_DELAY and len(oc_db.delayers) == 0 and not all(ready):
             # OC has been delayed
@@ -1215,7 +1220,7 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
 
                 payload["content"] = roles_str
 
-            delayers = list(oc_db.delayers)
+            delayers = []
 
             for participant in oc_data["participants"]:
                 participant_id = list(participant.keys())[0]
@@ -1225,7 +1230,7 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
                     delayers.append(int(participant_id))
 
                     participant_db: typing.Optional[User] = (
-                        User.select(User.discord_id).where(User.tid == participant_id).first()
+                        User.select(User.name, User.discord_id).where(User.tid == participant_id).first()
                     )
 
                     if participant_db is not None and participant_db.discord_id not in ("", 0, None):
@@ -1290,9 +1295,10 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
                             }
                         )
 
-            OrganizedCrime.update(delayers=delayers, notified=False).where(
-                OrganizedCrime.oc_id == oc_db.oc_id
-            ).execute()
+            if len(delayers) != 0:
+                OrganizedCrime.update(delayers=delayers).where(
+                    OrganizedCrime.oc_id == oc_db.oc_id
+                ).execute()
 
             try:
                 discordpost.delay(
