@@ -1066,6 +1066,11 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
 
     if faction.guild is None:
         return
+
+    OC_DELAY = False
+    OC_READY = False
+    OC_INITIATED = False
+
     if str(faction.tid) in faction.guild.oc_config:
         OC_DELAY = faction.guild.oc_config[str(faction.tid)].get("delay", {"channel": 0, "roles": []}).get(
             "channel"
@@ -1085,10 +1090,6 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
             None,
             0,
         ]
-    else:
-        OC_DELAY = False
-        OC_READY = False
-        OC_INITIATED = False
 
     # OC ready/delay/init notifs
     for oc_id, oc_data in oc_data["crimes"].items():
@@ -1135,9 +1136,6 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
                 OrganizedCrime.initiated_by,
                 OrganizedCrime.money_gain,
                 OrganizedCrime.respect_gain,
-                OrganizedCrime.delayers,
-                OrganizedCrime.notified,
-                OrganizedCrime.initiated,
             ],
         ).execute()
 
