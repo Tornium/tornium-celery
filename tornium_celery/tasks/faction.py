@@ -80,7 +80,7 @@ ATTACK_RESULTS = {
 )
 def refresh_factions():
     faction: Faction
-    for faction in Faction.select().join(Server):
+    for faction in Faction.select().join(Server, JOIN.LEFT_OUTER):
         leader: typing.Optional[User] = User.select(User.key).where(User.tid == faction.leader_id).first()
         coleader: typing.Optional[User] = User.select(User.key).where(User.tid == faction.coleader_id).first()
         aa_keys: typing.Set[str] = set()
@@ -464,7 +464,7 @@ def update_faction_ts(faction_ts_data):
 )
 def check_faction_ods(faction_od_data):
     try:
-        faction: Faction = Faction.select().join(Server).where(Faction.tid == faction_od_data["ID"]).get()
+        faction: Faction = Faction.select().join(Server, JOIN.LEFT_OUTER).where(Faction.tid == faction_od_data["ID"]).get()
     except (KeyError, DoesNotExist):
         return
 
@@ -622,7 +622,7 @@ def retal_attacks(faction_data, last_attacks=None):
         return
 
     try:
-        faction: Faction = Faction.select().join(Server).where(Faction.tid == faction_data["ID"]).get()
+        faction: Faction = Faction.select().join(Server, JOIN.LEFT_OUTER).where(Faction.tid == faction_data["ID"]).get()
     except (KeyError, DoesNotExist):
         return
 
@@ -1029,7 +1029,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
 @celery.shared_task(name="tasks.faction.oc_refresh", routing_key="quick.oc_refresh", queue="quick", time_limit=5)
 def oc_refresh():
     faction: Faction
-    for faction in Faction.select().join(Server).where(Faction.aa_keys != []):
+    for faction in Faction.select().join(Server, JOIN.LEFT_OUTER).where(Faction.aa_keys != []):
         if len(faction.aa_keys) == 0:
             continue
         elif faction.guild is None:
@@ -1061,7 +1061,7 @@ def oc_refresh():
 )
 def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
     try:
-        faction: Faction = Faction.select().join(Server).where(Faction.tid == oc_data["ID"]).get()
+        faction: Faction = Faction.select().join(Server, JOIN.LEFT_OUTER).where(Faction.tid == oc_data["ID"]).get()
     except DoesNotExist:
         return
 
@@ -1364,7 +1364,7 @@ def auto_cancel_requests():
             continue
 
         try:
-            faction: Faction = Faction.select(Faction.guild).join(Server).where(Faction.tid == withdrawal.faction_tid)
+            faction: Faction = Faction.select(Faction.guild).join(Server, JOIN.LEFT_OUTER).where(Faction.tid == withdrawal.faction_tid)
         except DoesNotExist:
             continue
 
@@ -1463,7 +1463,7 @@ def auto_cancel_requests():
 def armory_check():
     faction: Faction
     for faction in (
-        Faction.select(Faction.guild, Faction.tid, Faction.aa_keys).join(Server).where(Faction.aa_keys != [])
+        Faction.select(Faction.guild, Faction.tid, Faction.aa_keys).join(Server, JOIN.LEFT_OUTER).where(Faction.aa_keys != [])
     ):
         if len(faction.aa_keys) == 0:
             continue
