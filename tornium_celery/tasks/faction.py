@@ -211,6 +211,7 @@ def update_faction(faction_data):
                     User.level,
                     User.faction,
                     User.faction_aa,
+                    User.faction_position,
                     User.status,
                     User.last_action,
                     User.last_refresh,
@@ -264,7 +265,7 @@ def update_faction(faction_data):
         }
     )
     aa_keys = [k for k in aa_keys if k not in (None, "")]
-    Faction.update(aa_keys=list(aa_keys)).where(Faction.tid == faction_data["ID"]).execute()
+    Faction.update(aa_keys=aa_keys).where(Faction.tid == faction_data["ID"]).execute()
 
     # Strips old faction members of their faction data
     User.update(faction=None, faction_position=None, faction_aa=False).where(
@@ -336,7 +337,7 @@ def update_faction_positions(faction_positions_data: dict) -> typing.Optional[di
             access_fac_api=bool(perms["canAccessFactionApi"]),
             give_item=bool(perms["canGiveItem"]),
             give_money=bool(perms["canGiveMoney"]),
-            give_points=bool(perms["canGivePoitns"]),
+            give_points=bool(perms["canGivePoints"]),
             manage_forums=bool(perms["canManageForum"]),
             manage_applications=bool(perms["canManageApplications"]),
             kick_members=bool(perms["canKickMembers"]),
@@ -1123,7 +1124,6 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
             initiated_by=oc_data["initiated_by"] if oc_data["initiated_by"] != 0 else None,
             money_gain=oc_data["money_gain"] if oc_data["money_gain"] != 0 else None,
             respect_gain=oc_data["respect_gain"] if oc_data["respect_gain"] != 0 else None,
-            delayers=[],
         ).on_conflict(
             conflict_target=[OrganizedCrime.oc_id],
             preserve=[
