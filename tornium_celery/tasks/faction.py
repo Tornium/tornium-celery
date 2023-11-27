@@ -1032,9 +1032,13 @@ def oc_refresh():
     for faction in Faction.select().join(Server, JOIN.LEFT_OUTER).where(Faction.aa_keys != []):
         if len(faction.aa_keys) == 0:
             continue
-        elif faction.guild is None:
+        try:
+            if faction.guild is None:
+                continue
+        except DoesNotExist:
             continue
-        elif faction.tid not in faction.guild.factions:
+
+        if faction.tid not in faction.guild.factions:
             continue
         elif str(faction.tid) not in faction.guild.oc_config:
             continue
