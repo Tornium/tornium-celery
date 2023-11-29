@@ -1199,7 +1199,7 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
             )
         )
 
-        if OC_DELAY and len(oc_db.delayers) == 0 and not all(ready):
+        if OC_DELAY and len(oc_db.delayers) != 0 and not all(ready):
             # OC has been delayed
             payload = {
                 "embeds": [
