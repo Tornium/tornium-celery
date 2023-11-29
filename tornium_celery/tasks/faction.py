@@ -130,8 +130,8 @@ def refresh_factions():
                 link=update_faction_ts.s(),
             )
 
-        if faction.od_channel != 0 and faction.guild not in (None, 0):
-            try:
+        try:
+            if faction.od_channel != 0 and faction.guild is not None:
                 tornget.signature(
                     kwargs={
                         "endpoint": "faction/?selections=basic,contributors",
@@ -143,9 +143,8 @@ def refresh_factions():
                     expires=300,
                     link=check_faction_ods.s(),
                 )
-            except Exception as e:
-                logger.exception(e)
-                continue
+        except DoesNotExist:
+            pass
 
 
 @celery.shared_task(
@@ -626,9 +625,13 @@ def retal_attacks(faction_data, last_attacks=None):
     except (KeyError, DoesNotExist):
         return
 
-    if faction.guild is None:
+    try:
+        if faction.guild is None:
+            return
+    except DoesNotExist:
         return
-    elif faction.tid not in faction.guild.factions:
+
+    if faction.tid not in faction.guild.factions:
         return
     elif str(faction.tid) not in faction.guild.retal_config:
         return
@@ -1472,7 +1475,10 @@ def armory_check():
     ):
         if len(faction.aa_keys) == 0:
             continue
-        elif faction.guild is None:
+        try:
+            if faction.guild is None:
+                continue
+        except DoesNotExist:
             continue
 
         if faction.tid not in faction.guild.factions:

@@ -148,11 +148,12 @@ def refresh_guilds():
 
     for deleted_guild in guilds_not_updated:
         try:
-            guild: Server = Server.select().where(Server.sid == deleted_guild).first().delete_instance()
+            guild: Server = Server.select().where(Server.sid == deleted_guild).get()
         except DoesNotExist:
             continue
 
         logger.info(f"Deleted {guild.name} [{guild.sid}] from database (Reason: not found by Discord API)")
+        guild.delete_instance()
 
 
 @celery.shared_task(
