@@ -463,7 +463,9 @@ def update_faction_ts(faction_ts_data):
 )
 def check_faction_ods(faction_od_data):
     try:
-        faction: Faction = Faction.select().join(Server, JOIN.LEFT_OUTER).where(Faction.tid == faction_od_data["ID"]).get()
+        faction: Faction = (
+            Faction.select().join(Server, JOIN.LEFT_OUTER).where(Faction.tid == faction_od_data["ID"]).get()
+        )
     except (KeyError, DoesNotExist):
         return
 
@@ -1017,6 +1019,20 @@ def stat_db_attacks(faction_data, last_attacks=None):
         if opponent_score == 0:
             continue
 
+        if (
+            Stat.select()
+            .where(
+                (Stat.tid == opponent_id)
+                & (
+                    Stat.time_added
+                    == datetime.datetime.fromtimestamp(attack["timestamp_ended"], tz=datetime.timezone.utc)
+                )
+                & (Stat.added_group == 0 if faction.stats_db_global else user.faction_id)
+            )
+            .exists()
+        ):
+            continue
+
         try:
             Stat.create(
                 tid=opponent_id,
@@ -1139,6 +1155,7 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
                 OrganizedCrime.crime_id,
                 OrganizedCrime.participants,
                 OrganizedCrime.time_started,
+                OrganizedCrime.time_ready,
                 OrganizedCrime.time_completed,
                 OrganizedCrime.planned_by,
                 OrganizedCrime.initiated_by,
@@ -1197,12 +1214,14 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
 
         ready = list(
             map(
-                lambda participant: list(participant.values())[0].get("color") not in (None, "green"),
+                lambda participant: list(participant.values())[0].get("color") in (None, "green")
+                if list(participant.values())[0] is not None
+                else True,
                 oc_data["participants"],
             )
         )
 
-        if OC_DELAY and len(oc_db.delayers) != 0 and not all(ready):
+        if OC_DELAY and len(oc_db.delayers) == 0 and not all(ready):
             # OC has been delayed
             payload = {
                 "embeds": [
@@ -1372,7 +1391,9 @@ def auto_cancel_requests():
             continue
 
         try:
-            faction: Faction = Faction.select(Faction.guild).join(Server, JOIN.LEFT_OUTER).where(Faction.tid == withdrawal.faction_tid)
+            faction: Faction = (
+                Faction.select(Faction.guild).join(Server, JOIN.LEFT_OUTER).where(Faction.tid == withdrawal.faction_tid)
+            )
         except DoesNotExist:
             continue
 
@@ -1471,7 +1492,9 @@ def auto_cancel_requests():
 def armory_check():
     faction: Faction
     for faction in (
-        Faction.select(Faction.guild, Faction.tid, Faction.aa_keys).join(Server, JOIN.LEFT_OUTER).where(Faction.aa_keys != [])
+        Faction.select(Faction.guild, Faction.tid, Faction.aa_keys)
+        .join(Server, JOIN.LEFT_OUTER)
+        .where(Faction.aa_keys != [])
     ):
         if len(faction.aa_keys) == 0:
             continue
