@@ -1027,7 +1027,7 @@ def stat_db_attacks(faction_data, last_attacks=None):
                     Stat.time_added
                     == datetime.datetime.fromtimestamp(attack["timestamp_ended"], tz=datetime.timezone.utc)
                 )
-                & (Stat.added_group == 0 if faction.stats_db_global else user.faction_id)
+                & (Stat.added_group == (0 if faction.stats_db_global else user.faction_id))
             )
             .exists()
         ):
