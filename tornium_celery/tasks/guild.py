@@ -157,7 +157,10 @@ def refresh_guilds():
 
 
 @celery.shared_task(
-    name="tasks.guild.verify_users", routing_key="default.verify_users", queue="default", time_limit=600
+    name="tasks.guild.verify_users",
+    routing_key="default.verify_users",
+    queue="default",
+    time_limit=600,
 )
 def verify_users(
     guild_id: int,
@@ -414,7 +417,10 @@ def verify_users(
 
 
 @celery.shared_task(
-    name="tasks.guild.verify_member_sub", routing_key="quick.verify_member_sub", queue="quick", time_limit=60
+    name="tasks.guild.verify_member_sub",
+    routing_key="quick.verify_member_sub",
+    queue="quick",
+    time_limit=60,
 )
 def verify_member_sub(user_data: dict, log_channel: int, member: dict, guild_id: int):
     if "error" in user_data:

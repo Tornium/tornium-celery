@@ -307,7 +307,7 @@ def update_faction_positions(faction_positions_data: dict) -> typing.Optional[di
     deleted_position_name: str
     for deleted_position_name in existing_position_names - latest_position_names:
         try:
-            existing_positions.where(FactionPosition.name == deleted_position_name).delete_instance()
+            existing_positions.where(FactionPosition.name == deleted_position_name).first().delete_instance()
         except Exception as e:
             logger.exception(e)
             continue
@@ -1392,7 +1392,10 @@ def auto_cancel_requests():
 
         try:
             faction: Faction = (
-                Faction.select(Faction.guild).join(Server, JOIN.LEFT_OUTER).where(Faction.tid == withdrawal.faction_tid)
+                Faction.select(Faction.guild)
+                .join(Server, JOIN.LEFT_OUTER)
+                .where(Faction.tid == withdrawal.faction_tid)
+                .first()
             )
         except DoesNotExist:
             continue
