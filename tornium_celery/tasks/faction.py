@@ -25,7 +25,7 @@ import celery
 from celery.utils.log import get_task_logger
 from peewee import JOIN, DoesNotExist
 from tornium_commons import rds
-from tornium_commons.errors import DiscordError, NetworkingError, TornError
+from tornium_commons.errors import DiscordError, NetworkingError
 from tornium_commons.formatters import commas, torn_timestamp
 from tornium_commons.models import (
     Faction,
@@ -81,47 +81,24 @@ ATTACK_RESULTS = {
 def refresh_factions():
     faction: Faction
     for faction in Faction.select().join(Server, JOIN.LEFT_OUTER):
-        leader: typing.Optional[User] = User.select(User.key).where(User.tid == faction.leader_id).first()
-        coleader: typing.Optional[User] = User.select(User.key).where(User.tid == faction.coleader_id).first()
-        aa_keys: typing.Set[str] = set()
-
-        if leader is not None and leader.key not in (None, ""):
-            aa_keys.add(leader.key)
-        if coleader is not None and coleader.key not in (None, ""):
-            aa_keys.add(coleader.key)
-
-        aa_keys = aa_keys.union(
-            {
-                u.key
-                for u in User.select(User.key).where(
-                    (User.key.is_null(False))
-                    & (User.key != "")
-                    & (User.faction_id == faction.tid)
-                    & (User.faction_aa == True)  # noqa 712
-                )
-            }
-        )
-        aa_keys = [k for k in aa_keys if k not in (None, "")]
-        Faction.update(aa_keys=aa_keys).where(Faction.tid == faction.tid).execute()
-
-        if len(aa_keys) == 0:
+        if len(faction.aa_keys) == 0:
             continue
 
         tornget.signature(
             kwargs={
                 "endpoint": "faction/?selections=basic,positions",
-                "key": random.choice(aa_keys),
+                "key": random.choice(faction.aa_keys),
             },
             queue="api",
         ).apply_async(expires=300, link=update_faction.s())
 
         ts_key = ""
 
-        if leader is not None and leader.key not in ("", None):
-            ts_key = leader.key
+        if faction.leader is not None and faction.leader.key not in ("", None):
+            ts_key = faction.leader.key
         else:
-            if coleader is not None and coleader.key not in ("", None):
-                ts_key = coleader.key
+            if faction.coleader is not None and faction.coleader.key not in ("", None):
+                ts_key = faction.coleader.key
 
         if ts_key != "":
             torn_stats_get.signature(
@@ -131,12 +108,12 @@ def refresh_factions():
             )
 
         try:
-            if faction.od_channel != 0 and faction.guild is not None:
+            if faction.od_channel not in (None, 0) and faction.guild is not None:
                 tornget.signature(
                     kwargs={
                         "endpoint": "faction/?selections=basic,contributors",
                         "stat": "drugoverdoses",
-                        "key": random.choice(aa_keys),
+                        "key": random.choice(faction.aa_keys),
                     },
                     queue="api",
                 ).apply_async(
