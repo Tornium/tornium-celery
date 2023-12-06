@@ -243,6 +243,12 @@ def update_user_self(user_data, key=None):
         ],
     ).execute()
 
+    if user_data_kwargs.get("faction_aa"):
+        _faction = Faction.select(Faction.aa_keys).where(Faction.tid == faction).first()
+
+        if _faction is not None and key is not None and key not in _faction.aa_keys:
+            Faction.update(aa_keys=fn.array_append(Faction.aa_keys, key)).where(Faction.tid == faction).execute()
+
     # TODO: Attach latest PersonalStats obj to User obj
 
     now: typing.Union[datetime.datetime, int] = datetime.datetime.utcnow()
