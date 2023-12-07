@@ -1145,21 +1145,26 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
             continue
         elif oc_db.time_completed is not None:
             if (
-                OC_INITIATED and time.time() - oc_db.time_completed.timestamp() <= 299
+                OC_INITIATED and time.time() - oc_data["time_completed"] <= 299
             ):  # Prevents old OCs from being notified
-                if oc_db.money_gain == 0 and oc_db.respect_gain == 0:
+                if oc_data["money_gain"] == 0 and oc_data["respect_gain"] == 0:
                     oc_status_str = "unsuccessfully"
                     oc_result_str = ""
                     oc_color = SKYNET_ERROR
                 else:
                     oc_status_str = "successfully"
-                    oc_result_str = f" resulting in the gain of ${commas(oc_db.money_gain)} and {commas(oc_db.respect_gain)} respect"
+                    oc_result_str = f" resulting in the gain of ${commas(oc_data['money_gain'])} and {commas(oc_data['respect_gain'])} respect"
                     oc_color = SKYNET_GOOD
 
-                if oc_db.initiated_by is None or oc_db.initiated_by.name in (None, ""):
+                if oc_data["initiated_by"] == 0:
                     initiator_str = "Someone"
                 else:
-                    initiator_str = f"{oc_db.initiated_by.name} [{oc_db.initiated_by.tid}]"
+                    initiator: typing.Optional[User] = User.select(User.name).where(User.tid == oc_data["initiated_by"]).first()
+
+                    if initiator is None:
+                        initiator_str = "Someone"
+                    else:
+                        initiator_str = f"{initiator.name} [{oc_data['initiated_by']}]"
 
                 payload = {
                     "embeds": [
