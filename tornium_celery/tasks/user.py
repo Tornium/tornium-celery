@@ -21,7 +21,7 @@ from decimal import DivisionByZero
 
 import celery
 from celery.utils.log import get_task_logger
-from peewee import DoesNotExist, IntegrityError
+from peewee import DoesNotExist, IntegrityError, fn
 from tornium_commons import db, rds
 from tornium_commons.errors import MissingKeyError, NetworkingError, TornError
 from tornium_commons.models import Faction, FactionPosition, PersonalStats, Stat, User
@@ -247,7 +247,9 @@ def update_user_self(user_data, key=None):
         _faction = Faction.select(Faction.aa_keys).where(Faction.tid == user_data["faction"]["faction_id"]).first()
 
         if _faction is not None and key is not None and key not in _faction.aa_keys:
-            Faction.update(aa_keys=fn.array_append(Faction.aa_keys, key)).where(Faction.tid == user_data["faction"]["faction_id"]).execute()
+            Faction.update(aa_keys=fn.array_append(Faction.aa_keys, key)).where(
+                Faction.tid == user_data["faction"]["faction_id"]
+            ).execute()
 
     # TODO: Attach latest PersonalStats obj to User obj
 

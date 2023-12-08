@@ -1144,9 +1144,7 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
         if oc_db is None:
             continue
         elif oc_db.time_completed is not None:
-            if (
-                OC_INITIATED and time.time() - oc_data["time_completed"] <= 299
-            ):  # Prevents old OCs from being notified
+            if OC_INITIATED and time.time() - oc_data["time_completed"] <= 299:  # Prevents old OCs from being notified
                 if oc_data["money_gain"] == 0 and oc_data["respect_gain"] == 0:
                     oc_status_str = "unsuccessfully"
                     oc_result_str = ""
@@ -1159,7 +1157,9 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
                 if oc_data["initiated_by"] == 0:
                     initiator_str = "Someone"
                 else:
-                    initiator: typing.Optional[User] = User.select(User.name).where(User.tid == oc_data["initiated_by"]).first()
+                    initiator: typing.Optional[User] = (
+                        User.select(User.name).where(User.tid == oc_data["initiated_by"]).first()
+                    )
 
                     if initiator is None:
                         initiator_str = "Someone"
