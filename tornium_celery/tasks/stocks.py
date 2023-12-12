@@ -113,7 +113,7 @@ def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datet
             "timestamp": stocks_timestamp,
             "stock_id": stock["stock_id"],
             "price": stock["current_price"],
-            "market_cap": stock["market_cap"],
+            "cap": stock["market_cap"],
             "shares": stock["total_shares"],
             "investors": stock["investors"],
         }
