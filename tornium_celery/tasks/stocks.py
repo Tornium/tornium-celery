@@ -14,7 +14,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import datetime
-import random
 import time
 import typing
 
@@ -22,7 +21,6 @@ import celery
 from celery.utils.log import get_task_logger
 from redis.commands.json.path import Path
 from tornium_commons import db, rds
-from tornium_commons.errors import DiscordError, NetworkingError, TornError
 from tornium_commons.formatters import commas, torn_timestamp
 from tornium_commons.models import Notification, Server, StockTick, User
 from tornium_commons.skyutils import SKYNET_ERROR, SKYNET_GOOD, SKYNET_INFO
@@ -65,7 +63,12 @@ def _get_stocks_tick(
 )
 def stocks_prefetch():
     stocks_timestamp = datetime.datetime.utcnow().replace(second=5, microsecond=0, tzinfo=datetime.timezone.utc)
-    # TODO: Don't use ETA if the current time is past xx:xx:05
+
+    if int(time.time()) % 60 >= 5:
+        kwargs = {}
+    else:
+        kwargs = {"eta": stocks_timestamp}
+
     return tornget.signature(
         kwargs={
             "endpoint": "torn/?selections=stocks",
@@ -73,7 +76,6 @@ def stocks_prefetch():
         },
         queue="api",
     ).apply_async(
-        eta=stocks_timestamp,
         expires=50,
         link=celery.chain(
             update_stock_prices.signature(kwargs={"stocks_timestamp": stocks_timestamp}),
@@ -86,6 +88,7 @@ def stocks_prefetch():
                 ),
             ),
         ),
+        **kwargs,
     )
 
 
@@ -104,19 +107,20 @@ def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datet
 
     stocks = {}
     stock_benefits = {}
+    stocks_insert_data = [
+        {
+            "tick_id": int(bin(stock["stock_id"]), 2) + int(binary_timestamp, 22),
+            "timestamp": stocks_timestamp,
+            "stock_id": stock["stock_id"],
+            "price": stock["current_price"],
+            "market_cap": stock["market_cap"],
+            "shares": stock["total_shares"],
+            "investors": stock["investors"],
+        }
+        for stock in stocks_data["stocks"].values()
+    ]
 
-    with db().atomic():
-        cmd = """INSERT INTO stocktick (tick_id, timestmap, stock_id, price, cap, shares, investors)
-            VALUES
-        """
-
-        for stock in stocks_data["stocks"].values():
-            cmd += f"({int(bin(stock['stock_id']), 2) + int(binary_timestamp, 2)}, {stocks_timestamp}, {stock['stock_id']}, {stock['current_price']}, {stock['market_cap']}, {stock['total_shares']}, {stock['investors']}),\n"
-
-            stocks[stock["stock_id"]] = stock["acronym"]
-            stock_benefits[stock["stock_id"]] = stock["benefit"]
-
-        cmd = cmd[:-2] + "\nON CONFLICT (tick_id) DO NOTHING"
+    StockTick.insert_many(stocks_insert_data).on_conflict(conflict_target=[StockTick.tick_id], preserve=[]).execute()
 
     rds().json().set("tornium:stocks", Path.root_path(), stocks)
     rds().json().set("tornium:stocks:benefits", Path.root_path(), stock_benefits)
