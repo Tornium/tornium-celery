@@ -109,7 +109,7 @@ def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datet
     stock_benefits = {}
     stocks_insert_data = [
         {
-            "tick_id": int(bin(stock["stock_id"]), 2) + int(binary_timestamp, 22),
+            "tick_id": int(bin(stock["stock_id"]), 2) + int(binary_timestamp, 2),
             "timestamp": stocks_timestamp,
             "stock_id": stock["stock_id"],
             "price": stock["current_price"],
@@ -165,7 +165,7 @@ def stock_price_notifications(stocks_data: dict):
                         },
                         {
                             "name": "Target Price",
-                            "value": f"${commas(notification.value, stock_price=True)}",
+                            "value": f"${commas(notification.options['value'], stock_price=True)}",
                             "inline": True,
                         },
                         {
@@ -180,19 +180,25 @@ def stock_price_notifications(stocks_data: dict):
             ]
         }
 
-        if notification.options.get("equality") == ">" and target_stock["current_price"] > notification.value:
+        if (
+            notification.options.get("equality") == ">"
+            and target_stock["current_price"] > notification.options["value"]
+        ):
             payload["embeds"][0]["title"] = "Above Target Price"
             payload["embeds"][0]["color"] = SKYNET_GOOD
-        elif notification.options.get("equality") == "<" and target_stock["current_price"] < notification.value:
+        elif (
+            notification.options.get("equality") == "<"
+            and target_stock["current_price"] < notification.options["value"]
+        ):
             payload["embeds"][0]["title"] = "Below Target Price"
             payload["embeds"][0]["color"] = SKYNET_ERROR
-        elif notification.options.get("equality") == "=" and target_stock["current_price"] == notification.value:
+        elif (
+            notification.options.get("equality") == "="
+            and target_stock["current_price"] == notification.options["value"]
+        ):
             payload["embeds"][0]["title"] = "Reached Target Price"
             payload["embeds"][0]["color"] = SKYNET_GOOD
         else:
-            continue
-
-        if payload is None:
             continue
 
         if notification.recipient_guild == 0:

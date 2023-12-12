@@ -592,7 +592,12 @@ def fetch_attacks_runner():
         )
 
 
-@celery.shared_task(name="tasks.faction.retal_attacks", routing_key="quick.retal_attacks", queue="quick", time_limit=5)
+@celery.shared_task(
+    name="tasks.faction.retal_attacks",
+    routing_key="quick.retal_attacks",
+    queue="quick",
+    time_limit=5,
+)
 def retal_attacks(faction_data, last_attacks=None):
     if "attacks" not in faction_data:
         return
@@ -1022,7 +1027,12 @@ def stat_db_attacks(faction_data, last_attacks=None):
             continue
 
 
-@celery.shared_task(name="tasks.faction.oc_refresh", routing_key="quick.oc_refresh", queue="quick", time_limit=5)
+@celery.shared_task(
+    name="tasks.faction.oc_refresh",
+    routing_key="quick.oc_refresh",
+    queue="quick",
+    time_limit=5,
+)
 def oc_refresh():
     faction: Faction
     for faction in Faction.select().join(Server, JOIN.LEFT_OUTER).where(Faction.aa_keys != []):
@@ -1473,7 +1483,12 @@ def auto_cancel_requests():
         ).forget()
 
 
-@celery.shared_task(name="tasks.faction.armory_check", routing_key="quick.armory_check", queue="quick", time_limit=5)
+@celery.shared_task(
+    name="tasks.faction.armory_check",
+    routing_key="quick.armory_check",
+    queue="quick",
+    time_limit=5,
+)
 def armory_check():
     faction: Faction
     for faction in (
