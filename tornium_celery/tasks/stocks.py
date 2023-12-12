@@ -120,7 +120,7 @@ def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datet
         for stock in stocks_data["stocks"].values()
     ]
 
-    StockTick.insert_many(stocks_insert_data).on_conflict(conflict_target=[StockTick.tick_id], preserve=[]).execute()
+    StockTick.insert_many(stocks_insert_data).execute()
 
     rds().json().set("tornium:stocks", Path.root_path(), stocks)
     rds().json().set("tornium:stocks:benefits", Path.root_path(), stock_benefits)
