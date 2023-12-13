@@ -25,12 +25,7 @@ from celery.utils.log import get_task_logger
 from peewee import DoesNotExist
 from tornium_commons import rds
 from tornium_commons.errors import DiscordError, NetworkingError
-from tornium_commons.formatters import (
-    rel_time,
-    remove_html,
-    str_matches,
-    torn_timestamp,
-)
+from tornium_commons.formatters import remove_html, str_matches, torn_timestamp
 from tornium_commons.models import Faction, Notification, Server, User
 from tornium_commons.skyutils import SKYNET_ERROR, SKYNET_GOOD, SKYNET_INFO
 
@@ -55,7 +50,7 @@ _TRAVEL_DESTINATIONS = {
 
 
 def send_notification(notification: Notification, payload: dict):
-    if not notification.options["enabled"]:
+    if not notification.enabled:
         return
 
     if notification.recipient_type == 0:
@@ -116,11 +111,12 @@ def first_landing(duration):
 )
 def run_user_stakeouts():
     notification: Notification
-    for notification in Notification.select().where((Notification.n_type == 1) & (Notification.enabled == True)):
-        invoker: typing.Optional[User] = User.objects(tid=notification.invoker).first()
-
-        if invoker is None or invoker.key in ("", None):
+    for notification in (
+        Notification.select().join(User).where((Notification.n_type == 1) & (Notification.enabled == True))
+    ):
+        if notification.invoker is None or notification.invoker.key in ("", None):
             if notification.recipient_guild == 0:
+                notification.delete_instance()
                 continue
 
             guild: typing.Optional[Server] = Server.select().where(Server.sid == notification.recipient_guild).first()
@@ -136,7 +132,7 @@ def run_user_stakeouts():
 
             key = key_user.key
         else:
-            key = invoker.key
+            key = notification.invoker.key
 
         if key in ("", None):
             continue
@@ -167,7 +163,7 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
             & (Notification.enabled == True)
         )
     else:
-        notifications = Notifications.select().where(
+        notifications = Notification.select().where(
             (Notification.target == faction) & (Notification.n_type == 2) & (Notification.enabled == True)
         )
 
@@ -178,12 +174,7 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
     redis_client = rds()
 
     if "name" not in user_data:
-        user: typing.Optional[User] = User.select(User.name).where(User.tid == user_data["player_id"]).first()
-
-        if user is None:
-            user_data["name"] = "Unknown"
-        else:
-            user_data["name"] = user.name
+        user_data["name"] = User.user_str(user_data["player_id"])
 
     if "last_action" in user_data:
         if 305 < int(time.time()) - user_data["last_action"]["timestamp"] < 355:
@@ -204,9 +195,9 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
 
             notification: Notification
             for notification in notifications:
-                if faction is None and 1 not in notification.value:
+                if faction is None and 1 not in notification.options["value"]:
                     continue
-                elif faction is not None and 3 not in notification.value:
+                elif faction is not None and 3 not in notification.options["value"]:
                     continue
                 elif not notification.enabled:
                     continue
@@ -231,9 +222,9 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
 
             notification: Notification
             for notification in notifications:
-                if faction is None and 0 not in notification.value:
+                if faction is None and 0 not in notification.options["value"]:
                     continue
-                elif faction is not None and 2 not in notification.value:
+                elif faction is not None and 2 not in notification.options["value"]:
                     continue
                 elif not notification.enabled:
                     continue
@@ -300,9 +291,9 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
 
             notification: Notification
             for notification in notifications:
-                if faction is None and 2 not in notification.value:
+                if faction is None and 2 not in notification.options["value"]:
                     continue
-                elif faction is not None and 4 not in notification.value:
+                elif faction is not None and 4 not in notification.options["value"]:
                     continue
                 elif not notification.enabled:
                     continue
@@ -330,9 +321,9 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
 
             notification: Notification
             for notification in notifications:
-                if faction is None and 2 not in notification.value:
+                if faction is None and 2 not in notification.options["value"]:
                     continue
-                elif faction is not None and 4 not in notification.value:
+                elif faction is not None and 4 not in notification.options["value"]:
                     continue
                 elif not notification.enabled:
                     continue
@@ -360,9 +351,9 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
 
             notification: Notification
             for notification in notifications:
-                if faction is None and 3 not in notification.value:
+                if faction is None and 3 not in notification.options["value"]:
                     continue
-                elif faction is not None and 1 not in notification.value:
+                elif faction is not None and 1 not in notification.options["value"]:
                     continue
                 elif not notification.enabled:
                     continue
@@ -439,9 +430,9 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
 
             notification: Notification
             for notification in notifications:
-                if faction is None and 4 not in notification.value:
+                if faction is None and 4 not in notification.options["value"]:
                     continue
-                elif faction is not None and 1 not in notification.value:
+                elif faction is not None and 1 not in notification.options["value"]:
                     continue
                 elif not notification.enabled:
                     continue
@@ -477,13 +468,13 @@ def user_hook(user_data, faction: typing.Optional[int] = None):
     time_limit=10,
 )
 def run_faction_stakeouts():
-    notifictation: Notification
+    notification: Notification
     for notification in (
         Notification.select()
         .distinct(Notification.target)
         .where((Notification.n_type == 2) & (Notification.enabled == True))
     ):
-        invoker: typing.Optional[User] = User.select().where(user.tid == notification.invoker).first()
+        invoker: typing.Optional[User] = User.select().where(User.tid == notification.invoker).first()
 
         if invoker is None or invoker.key in ("", None):
             if notification.recipient_guild == 1:
@@ -570,7 +561,7 @@ def faction_hook(faction_data):
 
                 notification: Notification
                 for notification in notifications:
-                    if 0 not in notification.value:
+                    if 0 not in notification.options["value"]:
                         continue
                     elif not notification.enabled:
                         continue
@@ -601,9 +592,9 @@ def faction_hook(faction_data):
 
                     notification: Notification
                     for notification in notifications:
-                        if 0 not in notification.value:
+                        if 0 not in notification.options["value"]:
                             continue
-                        elif not notification.options["enabled"]:
+                        elif not notification.enabled:
                             continue
 
                         send_notification(notification, payload)
@@ -680,9 +671,9 @@ def faction_hook(faction_data):
             # TODO: Add function to generate list of notifications instead of in-line
             if valid_notifications is None:
                 for notification in notifications:
-                    if 5 not in notification.value:
+                    if 5 not in notification.options["value"]:
                         continue
-                    elif not notification.options["enabled"]:
+                    elif not notification.enabled:
                         continue
 
                     if valid_notifications is None:
@@ -716,7 +707,7 @@ def faction_hook(faction_data):
             if valid_notifications is None:
                 notification: Notification
                 for notification in notifications:
-                    if 5 not in notification.value:
+                    if 5 not in notification.options["value"]:
                         continue
                     elif not notification.enabled:
                         continue
