@@ -105,8 +105,8 @@ def update_stock_prices(stocks_data, stocks_timestamp: datetime.datetime = datet
     stocks_timestamp = stocks_timestamp.replace(second=0, tzinfo=datetime.timezone.utc)
     binary_timestamp = bin(int(stocks_timestamp.timestamp()) << 8)
 
-    stocks = {}
-    stock_benefits = {}
+    stocks = {stock["stock_id"]: stock["acronym"] for stock in stocks_data["stocks"].values()}
+    stock_benefits = {stock["stock_id"]: stock["benefit"] for stock in stocks_data["stocks"].values()}
     stocks_insert_data = [
         {
             "tick_id": int(bin(stock["stock_id"]), 2) + int(binary_timestamp, 2),
