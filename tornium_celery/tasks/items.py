@@ -59,6 +59,9 @@ def fetch_market():
     for item_id in unique_items:
         item_notifications = notifications.where(Notification.target == item_id)
 
+        if item_notifications.count() == 0:
+            continue
+
         if item_notifications.first().recipient_guild == 0:
             recipient = item_notifications.first().recipient
             key_user: typing.Optional[User] = User.select().where(User.discord_id == recipient).first()
