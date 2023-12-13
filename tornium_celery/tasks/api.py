@@ -169,6 +169,8 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
     except Exception as e:
         if request.status_code // 100 != 2:
             raise NetworkingError(code=request.status_code, url=url)
+        elif request.status_code == 204:
+            return
         else:
             raise e
 
@@ -226,6 +228,8 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
     except Exception as e:
         if request.status_code // 100 != 2:
             raise NetworkingError(code=request.status_code, url=url)
+        elif request.status_code == 204:
+            return
         else:
             raise e
 
@@ -283,6 +287,8 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
     except Exception as e:
         if request.status_code // 100 != 2:
             raise NetworkingError(code=request.status_code, url=url)
+        elif request.status_code == 204:
+            return
         else:
             raise e
 
@@ -339,6 +345,8 @@ def discordput(self, endpoint, payload, *args, **kwargs):
     except Exception as e:
         if request.status_code // 100 != 2:
             raise NetworkingError(code=request.status_code, url=url)
+        elif request.status_code == 204:
+            return
         else:
             raise e
 
@@ -391,6 +399,8 @@ def discorddelete(self, endpoint, *args, **kwargs):
     except Exception as e:
         if request.status_code // 100 != 2:
             raise NetworkingError(code=request.status_code, url=url)
+        elif request.status_code == 204:
+            return
         else:
             raise e
 
