@@ -1153,50 +1153,50 @@ def oc_refresh_subtask(oc_data):  # TODO: Refactor this to be more readable
 
         if oc_db is None:
             continue
-        elif oc_db.time_completed is None:
-            if OC_INITIATED and time.time() - oc_data["time_completed"] <= 299:  # Prevents old OCs from being notified
-                if oc_data["money_gain"] == 0 and oc_data["respect_gain"] == 0:
-                    oc_status_str = "unsuccessfully"
-                    oc_result_str = ""
-                    oc_color = SKYNET_ERROR
-                else:
-                    oc_status_str = "successfully"
-                    oc_result_str = f" resulting in the gain of ${commas(oc_data['money_gain'])} and {commas(oc_data['respect_gain'])} respect"
-                    oc_color = SKYNET_GOOD
+        elif (
+            oc_db.time_completed is None and OC_INITIATED and time.time() - oc_data["time_completed"] <= 299
+        ):  # Prevents old OCs from being notified
+            if oc_data["money_gain"] == 0 and oc_data["respect_gain"] == 0:
+                oc_status_str = "unsuccessfully"
+                oc_result_str = ""
+                oc_color = SKYNET_ERROR
+            else:
+                oc_status_str = "successfully"
+                oc_result_str = f" resulting in the gain of ${commas(oc_data['money_gain'])} and {commas(oc_data['respect_gain'])} respect"
+                oc_color = SKYNET_GOOD
 
-                if oc_data["initiated_by"] == 0:
+            if oc_data["initiated_by"] == 0:
+                initiator_str = "Someone"
+            else:
+                initiator: typing.Optional[User] = (
+                    User.select(User.name).where(User.tid == oc_data["initiated_by"]).first()
+                )
+
+                if initiator is None:
                     initiator_str = "Someone"
                 else:
-                    initiator: typing.Optional[User] = (
-                        User.select(User.name).where(User.tid == oc_data["initiated_by"]).first()
-                    )
+                    initiator_str = f"{initiator.name} [{oc_data['initiated_by']}]"
 
-                    if initiator is None:
-                        initiator_str = "Someone"
-                    else:
-                        initiator_str = f"{initiator.name} [{oc_data['initiated_by']}]"
+            payload = {
+                "embeds": [
+                    {
+                        "title": f"OC of {faction.name} Initiated",
+                        "description": f"{ORGANIZED_CRIMES[oc_data['crime_id']]} has been {oc_status_str} "
+                        f"initiated by {initiator_str}{oc_result_str}.",
+                        "color": oc_color,
+                        "timestamp": datetime.datetime.utcnow().isoformat(),
+                        "footer": {"text": f"#{oc_db.oc_id}"},
+                    }
+                ],
+            }
 
-                payload = {
-                    "embeds": [
-                        {
-                            "title": f"OC of {faction.name} Initiated",
-                            "description": f"{ORGANIZED_CRIMES[oc_data['crime_id']]} has been {oc_status_str} "
-                            f"initiated by {initiator_str}{oc_result_str}.",
-                            "color": oc_color,
-                            "timestamp": datetime.datetime.utcnow().isoformat(),
-                            "footer": {"text": f"#{oc_db.oc_id}"},
-                        }
-                    ],
-                }
-
-                try:
-                    discordpost.delay(
-                        f'channels/{faction.guild.oc_config[str(faction.tid)]["initiated"]["channel"]}/messages',
-                        payload=payload,
-                    )
-                except Exception as e:
-                    logger.exception(e)
-                    continue
+            try:
+                discordpost.delay(
+                    f'channels/{faction.guild.oc_config[str(faction.tid)]["initiated"]["channel"]}/messages',
+                    payload=payload,
+                )
+            except Exception as e:
+                logger.exception(e)
 
             continue
         elif oc_db.time_ready.timestamp() > int(time.time()):
