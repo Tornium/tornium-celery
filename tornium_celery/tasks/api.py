@@ -17,6 +17,7 @@ import datetime
 import json
 import random
 import typing
+from functools import wraps
 
 if globals().get("orjson:loaded"):
     import orjson
@@ -72,6 +73,139 @@ def discord_ratelimit_pre(
     logger.debug(f"{method}|{endpoint.split('?')[0]} :: {bucket._id} :: {bucket.remaining} / {bucket.limit}")
 
     return bucket
+
+
+def handle_discord_error(f):
+    @wraps
+    def wrapper(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except DiscordError as e:
+            from tornium_commons.models import Faction, Notification, Server
+            from tornium_commons.skyutils import SKYNET_ERROR
+
+            # Channel errors
+            if e.code in (
+                # 10003,  # Unknown channel
+                50001,  # Missing access
+                50013,  # You lack permissions to perform that action
+            ) and e.url.startswith("channels/"):
+                try:
+                    channel_id = int(e.url.split("/")[1])
+                except ValueError:
+                    raise e
+
+                channel_data = discordget(f"channels/{channel_id}")
+
+                if channel_data["type"] in (
+                    1,  # Direct Message
+                    3,  # Group DM
+                ):
+                    raise e
+
+                webhook_data = discordpost(
+                    f"channels/{channel_id}/webhooks",
+                    payload={
+                        "name": "Tornium-Errors",
+                        # "avatar": "",
+                        # Avatar is a base 64 encoded image using the data URI scheme.
+                        # https://discord.com/developers/docs/reference#image-data
+                    },
+                )
+
+                guild: typing.Optional[Server] = (
+                    Server.select(
+                        Server.verify_log_channel,
+                        Server.retal_config,
+                        Server.banking_config,
+                        Server.armory_config,
+                        Server.assist_channel,
+                        Server.oc_config,
+                    )
+                    .where(Server.sid == webhook_data["guild_id"])
+                    .first()
+                )
+
+                if guild is None:
+                    raise e
+
+                db_updates = {}
+
+                if int(guild.verify_log_channel) == channel_id:
+                    db_updates["verify_log_channel"] = 0
+
+                for retal_faction, retal_config in guild.retal_config.items():
+                    if int(retal_config.get("channel", 0)) != channel_id:
+                        continue
+                    elif "retal_config" not in db_updates:
+                        db_updates["retal_config"] = guild.retal_config
+
+                    db_updates["retal_config"][retal_faction]["channel"] = 0
+
+                for banking_faction, banking_config in guild.banking_config.items():
+                    if int(banking_config.get("channel", 0)) != channel_id:
+                        continue
+                    elif "banking_config" not in db_updates:
+                        db_updates["banking_config"] = guild.banking_config
+
+                    db_updates["banking_config"][banking_faction]["channel"] = 0
+
+                for armory_faction, armory_config in guild.armory_config.items():
+                    if int(armory_config.get("channel", 0)) != channel_id:
+                        continue
+                    elif "armory_config" not in db_updates:
+                        db_updates["armory_config"] = guild.armory_config
+
+                    db_updates["armory_config"][armory_faction]["channel"] = 0
+
+                if int(guild.assist_channel) == channel_id:
+                    db_updates["assist_channel"] = 0
+
+                for oc_faction, oc_config in guild.oc_config.items():
+                    for oc_n_type, oc_n_config in oc_config.items():
+                        if int(oc_n_config.get("channel", 0)) != channel_id:
+                            continue
+                        elif "oc_config" not in db_updates:
+                            db_updates["oc_config"] = guild.oc_config
+
+                        db_updates["oc_config"][oc_faction][oc_n_type]["channel"] = 0
+
+                Server.update(**db_updates).where(Server.sid == webhook_data["guild_id"]).execute()
+                Faction.update(od_channel=0).where(Faction.od_channel == channel_id).execute()
+                Notification.update(enabled=False).where(
+                    (Notification.recipient == channel_id) & (Notification.recipient_guild != 0)
+                ).execute()
+
+                payload = {
+                    "embeds": [
+                        {
+                            "title": "Channel Error",
+                            "description": (
+                                "Failed to perform an action in this channel (most likely send a notification) "
+                                "due to an error from Discord. The configuration that has failed has been disabled/deleted, "
+                                "once you fix this issue, you can re-enable the feature on the bot dashboard."
+                            ),
+                            "color": SKYNET_ERROR,
+                        },
+                    ],
+                }
+
+                if e.code == 50001:
+                    payload["embeds"][0][
+                        "description"
+                    ] += " The bot most likely is unable to see this channel. Make sure that the bot has read permissions for this channel."
+                elif e.code == 50013:
+                    payload["embeds"][0]["description"] += " The bot most likely is unable to write to this channel."
+
+                if guild is not None and len(guild.admins) != 0:
+                    payload["content"] = "".join([f"<@{admin}>" for admin in guild.admins])
+
+                discordpost(f"webhooks/{webhook_data['id']}/{webhook_data['token']}", payload=payload)
+                discorddelete(f"webhooks/{webhook_data['id']}")
+
+            raise e
+
+    return wrapper
 
 
 @celery.shared_task(name="tasks.api.tornget", time_limit=5, routing_key="api.tornget", queue="api")
@@ -145,6 +279,7 @@ def tornget(
     queue="api",
     time_limit=10,
 )
+@handle_discord_error
 def discordget(self: celery.Task, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {"Authorization": f'Bot {config["bot_token"]}'}
@@ -179,7 +314,7 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
         if request_json["code"] == 0:
             logger.info(request_json)
 
-        raise DiscordError(code=request_json["code"], message=request_json["message"])
+        raise DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
     elif request.status_code // 100 != 2:
         raise NetworkingError(code=request.status_code, url=url)
 
@@ -194,6 +329,7 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
     queue="api",
     time_limit=10,
 )
+@handle_discord_error
 def discordpatch(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
@@ -237,7 +373,7 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
         if request_json["code"] == 0:
             logger.info(request_json)
 
-        raise DiscordError(code=request_json["code"], message=request_json["message"])
+        raise DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
     elif request.status_code // 100 != 2:
         raise NetworkingError(code=request.status_code, url=url)
 
@@ -252,6 +388,7 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
     queue="api",
     time_limit=10,
 )
+@handle_discord_error
 def discordpost(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
@@ -295,7 +432,7 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
         if request_json["code"] == 0:
             logger.info(request_json)
 
-        raise DiscordError(code=request_json["code"], message=request_json["message"])
+        raise DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
     elif request.status_code // 100 != 2:
         raise NetworkingError(code=request.status_code, url=url)
 
@@ -309,6 +446,7 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
     routing_key="api.discordput",
     queue="api",
 )
+@handle_discord_error
 def discordput(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
@@ -352,7 +490,7 @@ def discordput(self, endpoint, payload, *args, **kwargs):
         if request_json["code"] == 0:
             logger.info(request_json)
 
-        raise DiscordError(code=request_json["code"], message=request_json["message"])
+        raise DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
     elif request.status_code // 100 != 2:
         raise NetworkingError(code=request.status_code, url=url)
 
@@ -367,6 +505,7 @@ def discordput(self, endpoint, payload, *args, **kwargs):
     queue="api",
     time_limit=5,
 )
+@handle_discord_error
 def discorddelete(self, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
@@ -404,7 +543,7 @@ def discorddelete(self, endpoint, *args, **kwargs):
         if request_json["code"] == 0:
             logger.info(request_json)
 
-        raise DiscordError(code=request_json["code"], message=request_json["message"])
+        raise DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
     elif request.status_code // 100 != 2:
         raise NetworkingError(code=request.status_code, url=url)
 
