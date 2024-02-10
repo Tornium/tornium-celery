@@ -86,10 +86,12 @@ def handle_discord_error(f):
 
             # Channel errors
             if e.code in (
-                # 10003,  # Unknown channel
+                10003,  # Unknown channel
                 50001,  # Missing access
                 50013,  # You lack permissions to perform that action
             ) and e.url.startswith("channels/"):
+                only_delete = e.code in (10003,)
+
                 try:
                     channel_id = int(e.url.split("/")[1])
                 except ValueError:
@@ -103,16 +105,6 @@ def handle_discord_error(f):
                 ):
                     raise e
 
-                webhook_data = discordpost(
-                    f"channels/{channel_id}/webhooks",
-                    payload={
-                        "name": "Tornium-Errors",
-                        # "avatar": "",
-                        # Avatar is a base 64 encoded image using the data URI scheme.
-                        # https://discord.com/developers/docs/reference#image-data
-                    },
-                )
-
                 guild: typing.Optional[Server] = (
                     Server.select(
                         Server.verify_log_channel,
@@ -122,7 +114,7 @@ def handle_discord_error(f):
                         Server.assist_channel,
                         Server.oc_config,
                     )
-                    .where(Server.sid == webhook_data["guild_id"])
+                    .where(Server.sid == channel_data["guild_id"])
                     .first()
                 )
 
@@ -170,11 +162,14 @@ def handle_discord_error(f):
 
                         db_updates["oc_config"][oc_faction][oc_n_type]["channel"] = 0
 
-                Server.update(**db_updates).where(Server.sid == webhook_data["guild_id"]).execute()
+                Server.update(**db_updates).where(Server.sid == channel_data["guild_id"]).execute()
                 Faction.update(od_channel=0).where(Faction.od_channel == channel_id).execute()
                 Notification.update(enabled=False).where(
                     (Notification.recipient == channel_id) & (Notification.recipient_guild != 0)
                 ).execute()
+
+                if only_delete:
+                    raise e
 
                 payload = {
                     "embeds": [
@@ -199,6 +194,16 @@ def handle_discord_error(f):
 
                 if guild is not None and len(guild.admins) != 0:
                     payload["content"] = "".join([f"<@{admin}>" for admin in guild.admins])
+
+                webhook_data = discordpost(
+                    f"channels/{channel_id}/webhooks",
+                    payload={
+                        "name": "Tornium-Errors",
+                        # "avatar": "",
+                        # Avatar is a base 64 encoded image using the data URI scheme.
+                        # https://discord.com/developers/docs/reference#image-data
+                    },
+                )
 
                 discordpost(f"webhooks/{webhook_data['id']}/{webhook_data['token']}", payload=payload)
                 discorddelete(f"webhooks/{webhook_data['id']}")
