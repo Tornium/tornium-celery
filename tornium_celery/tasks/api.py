@@ -276,6 +276,7 @@ def tornget(
     return request
 
 
+@handle_discord_error
 @celery.shared_task(
     name="tasks.api.discordget",
     bind=True,
@@ -284,7 +285,6 @@ def tornget(
     queue="api",
     time_limit=10,
 )
-@handle_discord_error
 def discordget(self: celery.Task, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {"Authorization": f'Bot {config["bot_token"]}'}
@@ -326,6 +326,7 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
     return request_json
 
 
+@handle_discord_error
 @celery.shared_task(
     name="tasks.api.discordpatch",
     bind=True,
@@ -334,7 +335,6 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
     queue="api",
     time_limit=10,
 )
-@handle_discord_error
 def discordpatch(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
@@ -385,6 +385,7 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
     return request_json
 
 
+@handle_discord_error
 @celery.shared_task(
     name="tasks.api.discordpost",
     bind=True,
@@ -393,7 +394,6 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
     queue="api",
     time_limit=10,
 )
-@handle_discord_error
 def discordpost(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
@@ -444,6 +444,7 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
     return request_json
 
 
+@handle_discord_error
 @celery.shared_task(
     name="tasks.api.discordput",
     bind=True,
@@ -451,7 +452,6 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
     routing_key="api.discordput",
     queue="api",
 )
-@handle_discord_error
 def discordput(self, endpoint, payload, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
@@ -502,6 +502,7 @@ def discordput(self, endpoint, payload, *args, **kwargs):
     return request_json
 
 
+@handle_discord_error
 @celery.shared_task(
     name="tasks.api.discorddelete",
     bind=True,
@@ -510,7 +511,6 @@ def discordput(self, endpoint, payload, *args, **kwargs):
     queue="api",
     time_limit=5,
 )
-@handle_discord_error
 def discorddelete(self, endpoint, *args, **kwargs):
     url = f"https://discord.com/api/v10/{endpoint}"
     headers = {
