@@ -93,17 +93,22 @@ def handle_discord_error(e: DiscordError):
             return
 
         try:
-            channel_data = requests.get(
-                f"https://discord.com/api/v10/channels/{channel_id}",
-                headers={"Authorization": f'Bot {config["bot_token"]}'},
+            webhook_data = requests.post(
+                f"https://discord.com/api/v10/channels/{channel_id}/webhooks",
+                headers={"Authorization": f'Bot {config["bot_token"]}', "Content-Type": "application/json"},
+                data=json.dumps(
+                    {
+                        "name": "Tornium-Errors",
+                        # "avatar": "",
+                        # Avatar is a base 64 encoded image using the data URI scheme.
+                        # https://discord.com/developers/docs/reference#image-data
+                    }
+                ),
             ).json()
         except:  # noqa 722
             return
 
-        if channel_data["type"] in (
-            1,  # Direct Message
-            3,  # Group DM
-        ):
+        if "code" in webhook_data:
             return
 
         guild: typing.Optional[Server] = (
@@ -115,7 +120,7 @@ def handle_discord_error(e: DiscordError):
                 Server.assist_channel,
                 Server.oc_config,
             )
-            .where(Server.sid == channel_data["guild_id"])
+            .where(Server.sid == webhook_data["guild_id"])
             .first()
         )
 
@@ -163,7 +168,7 @@ def handle_discord_error(e: DiscordError):
 
                 db_updates["oc_config"][oc_faction][oc_n_type]["channel"] = 0
 
-        Server.update(**db_updates).where(Server.sid == channel_data["guild_id"]).execute()
+        Server.update(**db_updates).where(Server.sid == webhook_data["guild_id"]).execute()
         Faction.update(od_channel=0).where(Faction.od_channel == channel_id).execute()
         Notification.update(enabled=False).where(
             (Notification.recipient == channel_id) & (Notification.recipient_guild != 0)
@@ -197,22 +202,6 @@ def handle_discord_error(e: DiscordError):
             payload["content"] = "".join([f"<@{admin}>" for admin in guild.admins])
 
         try:
-            webhook_data = requests.post(
-                f"https://discord.com/api/v10/channels/{channel_id}/webhooks",
-                headers={"Authorization": f'Bot {config["bot_token"]}', "Content-Type": "application/json"},
-                data=json.dumps(
-                    {
-                        "name": "Tornium-Errors",
-                        # "avatar": "",
-                        # Avatar is a base 64 encoded image using the data URI scheme.
-                        # https://discord.com/developers/docs/reference#image-data
-                    }
-                ),
-            ).json()
-
-            if "code" in webhook_data:
-                return
-
             requests.post(
                 f"https://discord.com/api/v10/webhooks/{webhook_data['id']}/{webhook_data['token']}",
                 headers={"Authorization": f'Bot {config["bot_token"]}', "Content-Type": "application/json"},
