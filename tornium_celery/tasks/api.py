@@ -92,7 +92,13 @@ def handle_discord_error(e: DiscordError):
         except ValueError:
             return
 
-        channel_data = discordget(f"channels/{channel_id}")
+        try:
+            channel_data = requests.get(
+                f"https://discord.com/api/v10/channels/{channel_id}",
+                headers={"Authorization": f'Bot {config["bot_token"]}'},
+            ).json()
+        except:  # noqa 722
+            return
 
         if channel_data["type"] in (
             1,  # Direct Message
@@ -190,18 +196,34 @@ def handle_discord_error(e: DiscordError):
         if guild is not None and len(guild.admins) != 0:
             payload["content"] = "".join([f"<@{admin}>" for admin in guild.admins])
 
-        webhook_data = discordpost(
-            f"channels/{channel_id}/webhooks",
-            payload={
-                "name": "Tornium-Errors",
-                # "avatar": "",
-                # Avatar is a base 64 encoded image using the data URI scheme.
-                # https://discord.com/developers/docs/reference#image-data
-            },
-        )
+        try:
+            webhook_data = requests.post(
+                f"https://discord.com/api/v10/channels/{channel_id}/webhooks",
+                headers={"Authorization": f'Bot {config["bot_token"]}', "Content-Type": "application/json"},
+                data=json.dumps(
+                    {
+                        "name": "Tornium-Errors",
+                        # "avatar": "",
+                        # Avatar is a base 64 encoded image using the data URI scheme.
+                        # https://discord.com/developers/docs/reference#image-data
+                    }
+                ),
+            ).json()
 
-        discordpost(f"webhooks/{webhook_data['id']}/{webhook_data['token']}", payload=payload)
-        discorddelete(f"webhooks/{webhook_data['id']}")
+            if "code" in webhook_data:
+                return
+
+            requests.post(
+                f"https://discord.com/api/v10/webhooks/{webhook_data['id']}/{webhook_data['token']}",
+                headers={"Authorization": f'Bot {config["bot_token"]}', "Content-Type": "application/json"},
+                data=json.dumps(payload),
+            )
+            requests.delete(
+                f"https://discord.com/api/v10/webhooks/{webhook_data['id']}",
+                headers={"Authorization": f'Bot {config["bot_token"]}', "Content-Type": "application/json"},
+            )
+        except:  # noqa 722
+            pass
 
 
 @celery.shared_task(name="tasks.api.tornget", time_limit=5, routing_key="api.tornget", queue="api")
