@@ -75,35 +75,30 @@ def discord_ratelimit_pre(
     return bucket
 
 
-def handle_discord_error(f):
-    @wraps
-    def wrapper(*args, **kwargs):
+def handle_discord_error(e: DiscordError):
+    from tornium_commons.models import Faction, Notification, Server
+    from tornium_commons.skyutils import SKYNET_ERROR
+
+    # Channel errors
+    if e.code in (
+        10003,  # Unknown channel
+        50001,  # Missing access
+        50013,  # You lack permissions to perform that action
+    ) and e.url.startswith("channels/"):
+        only_delete = e.code in (10003,)
+
         try:
-            return f(*args, **kwargs)
-        except DiscordError as e:
-            from tornium_commons.models import Faction, Notification, Server
-            from tornium_commons.skyutils import SKYNET_ERROR
+            channel_id = int(e.url.split("/")[1])
+        except ValueError:
+            return
 
-            # Channel errors
-            if e.code in (
-                10003,  # Unknown channel
-                50001,  # Missing access
-                50013,  # You lack permissions to perform that action
-            ) and e.url.startswith("channels/"):
-                only_delete = e.code in (10003,)
+            channel_data = discordget(f"channels/{channel_id}")
 
-                try:
-                    channel_id = int(e.url.split("/")[1])
-                except ValueError:
-                    raise e
-
-                channel_data = discordget(f"channels/{channel_id}")
-
-                if channel_data["type"] in (
-                    1,  # Direct Message
-                    3,  # Group DM
-                ):
-                    raise e
+            if channel_data["type"] in (
+                1,  # Direct Message
+                3,  # Group DM
+            ):
+                return
 
                 guild: typing.Optional[Server] = (
                     Server.select(
@@ -119,7 +114,7 @@ def handle_discord_error(f):
                 )
 
                 if guild is None:
-                    raise e
+                    return
 
                 db_updates = {}
 
@@ -169,7 +164,7 @@ def handle_discord_error(f):
                 ).execute()
 
                 if only_delete:
-                    raise e
+                    return
 
                 payload = {
                     "embeds": [
@@ -207,10 +202,6 @@ def handle_discord_error(f):
 
                 discordpost(f"webhooks/{webhook_data['id']}/{webhook_data['token']}", payload=payload)
                 discorddelete(f"webhooks/{webhook_data['id']}")
-
-            raise e
-
-    return wrapper
 
 
 @celery.shared_task(name="tasks.api.tornget", time_limit=5, routing_key="api.tornget", queue="api")
@@ -276,7 +267,6 @@ def tornget(
     return request
 
 
-@handle_discord_error
 @celery.shared_task(
     name="tasks.api.discordget",
     bind=True,
@@ -319,14 +309,15 @@ def discordget(self: celery.Task, endpoint, *args, **kwargs):
         if request_json["code"] == 0:
             logger.info(request_json)
 
-        raise DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
+        error = DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
+        handle_discord_error(error)
+        raise error
     elif request.status_code // 100 != 2:
         raise NetworkingError(code=request.status_code, url=url)
 
     return request_json
 
 
-@handle_discord_error
 @celery.shared_task(
     name="tasks.api.discordpatch",
     bind=True,
@@ -378,14 +369,15 @@ def discordpatch(self, endpoint, payload, *args, **kwargs):
         if request_json["code"] == 0:
             logger.info(request_json)
 
-        raise DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
+        error = DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
+        handle_discord_error(error)
+        raise error
     elif request.status_code // 100 != 2:
         raise NetworkingError(code=request.status_code, url=url)
 
     return request_json
 
 
-@handle_discord_error
 @celery.shared_task(
     name="tasks.api.discordpost",
     bind=True,
@@ -437,14 +429,15 @@ def discordpost(self, endpoint, payload, *args, **kwargs):
         if request_json["code"] == 0:
             logger.info(request_json)
 
-        raise DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
+        error = DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
+        handle_discord_error(error)
+        raise error
     elif request.status_code // 100 != 2:
         raise NetworkingError(code=request.status_code, url=url)
 
     return request_json
 
 
-@handle_discord_error
 @celery.shared_task(
     name="tasks.api.discordput",
     bind=True,
@@ -495,14 +488,15 @@ def discordput(self, endpoint, payload, *args, **kwargs):
         if request_json["code"] == 0:
             logger.info(request_json)
 
-        raise DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
+        error = DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
+        handle_discord_error(error)
+        raise error
     elif request.status_code // 100 != 2:
         raise NetworkingError(code=request.status_code, url=url)
 
     return request_json
 
 
-@handle_discord_error
 @celery.shared_task(
     name="tasks.api.discorddelete",
     bind=True,
@@ -548,7 +542,9 @@ def discorddelete(self, endpoint, *args, **kwargs):
         if request_json["code"] == 0:
             logger.info(request_json)
 
-        raise DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
+        error = DiscordError(code=request_json["code"], message=request_json["message"], url=endpoint)
+        handle_discord_error(error)
+        raise error
     elif request.status_code // 100 != 2:
         raise NetworkingError(code=request.status_code, url=url)
 
