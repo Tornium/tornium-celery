@@ -168,7 +168,9 @@ def handle_discord_error(e: DiscordError):
 
                 db_updates["oc_config"][oc_faction][oc_n_type]["channel"] = 0
 
-        Server.update(**db_updates).where(Server.sid == webhook_data["guild_id"]).execute()
+        if len(db_updates) != 0:
+            Server.update(**db_updates).where(Server.sid == webhook_data["guild_id"]).execute()
+
         Faction.update(od_channel=0).where(Faction.od_channel == channel_id).execute()
         Notification.update(enabled=False).where(
             (Notification.recipient == channel_id) & (Notification.recipient_guild != 0)
@@ -197,9 +199,6 @@ def handle_discord_error(e: DiscordError):
             ] += " The bot most likely is unable to see this channel. Make sure that the bot has read permissions for this channel."
         elif e.code == 50013:
             payload["embeds"][0]["description"] += " The bot most likely is unable to write to this channel."
-
-        if guild is not None and len(guild.admins) != 0:
-            payload["content"] = "".join([f"<@{admin}>" for admin in guild.admins])
 
         try:
             requests.post(
