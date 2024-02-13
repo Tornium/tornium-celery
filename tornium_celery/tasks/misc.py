@@ -16,7 +16,7 @@
 import celery
 from peewee import DoesNotExist, fn
 from tornium_commons import rds
-from tornium_commons.models import Faction, User
+from tornium_commons.models import Faction, TornKey, User
 
 
 @celery.shared_task(
@@ -52,21 +52,17 @@ def send_dm(discord_id: int, payload: dict):
 )
 def remove_key_error(key: str, error: int):
     try:
-        user: User = User.select().where(User.key == key).get()
+        key: TornKey = TornKey.select(TornKey.user).where(TornKey.key == key).get()
     except DoesNotExist:
-        Faction.update(aa_keys=fn.array_remove(Faction.aa_keys, key)).execute()
         return
 
-    if error == 7:
-        user.faction_aa = False
-        user.faction_position = None
-        user.save()
+    user_id = key.user_id
+    key.delete_instance()
 
+    if error == 7:
+        User.update(faction_aa=False, faction_position=None).where(User.tid == user_id).execute()
         Faction.update(aa_keys=fn.array_remove(Faction.aa_keys, key)).execute()
     elif error in (2, 10, 13):
-        user.key = None
-        user.save()
-
         Faction.update(aa_keys=fn.array_remove(Faction.aa_keys, key)).execute()
 
 

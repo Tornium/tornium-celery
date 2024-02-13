@@ -24,7 +24,14 @@ from celery.utils.log import get_task_logger
 from peewee import DoesNotExist, fn
 from tornium_commons import rds
 from tornium_commons.errors import MissingKeyError, NetworkingError, TornError
-from tornium_commons.models import Faction, FactionPosition, PersonalStats, Stat, User
+from tornium_commons.models import (
+    Faction,
+    FactionPosition,
+    PersonalStats,
+    Stat,
+    TornKey,
+    User,
+)
 
 from .api import tornget
 
@@ -66,13 +73,12 @@ def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, r
 
         user_id = tid
     elif discordid == tid == 0:
-        user = User.select(User.last_refresh).where(User.key == key).first()
+        try:
+            user = TornKey.select(TornKey.user).where(TornKey.key == key).get().user
+        except DoesNotExist:
+            return
 
-        if (
-            user is not None
-            and user.last_refresh is not None
-            and time.time() - user.last_refresh.timestamp() <= MIN_USER_UPDATE
-        ):
+        if user.last_refresh is not None and time.time() - user.last_refresh.timestamp() <= MIN_USER_UPDATE:
             return
 
         user_id = 0
@@ -139,6 +145,7 @@ def update_user_self(user_data, key=None):
     user_data_kwargs = {"faction_aa": False}
 
     if key is not None:
+        TornKey.insert(api_key=None, user=None, default=False, disabled=False, paused=False, access_level=False)
         user_data_kwargs["key"] = key
 
     faction: typing.Optional[Faction]
@@ -157,7 +164,7 @@ def update_user_self(user_data, key=None):
         )
 
         if key is not None:
-            faction = Faction.select(Faction.aa_keys).where(Faction.tid == user_data["faction"]["faction_id"]).first()
+            faction = Faction.select(Faction.tid).where(Faction.tid == user_data["faction"]["faction_id"]).first()
 
             if faction is not None and len(faction.aa_keys) == 0:
                 from .faction import update_faction_positions
@@ -287,14 +294,6 @@ def update_user_self(user_data, key=None):
         ],
     ).execute()
 
-    if user_data_kwargs.get("faction_aa"):
-        _faction = Faction.select(Faction.aa_keys).where(Faction.tid == user_data["faction"]["faction_id"]).first()
-
-        if _faction is not None and key is not None and key not in _faction.aa_keys:
-            Faction.update(aa_keys=fn.array_append(Faction.aa_keys, key)).where(
-                Faction.tid == user_data["faction"]["faction_id"]
-            ).execute()
-
 
 @celery.shared_task(
     name="tasks.user.update_user_other",
@@ -349,7 +348,6 @@ def update_user_other(user_data):
 
             if faction_position is None:
                 user_data_kwargs["faction_position"] = None
-
                 user_data_kwargs["faction_aa"] = False
             else:
                 user_data_kwargs["faction_position"] = faction_position
@@ -435,12 +433,16 @@ def update_user_other(user_data):
     time_limit=5,
 )
 def refresh_users():
-    user: User
-    for user in User.select().where((User.key.is_null(False)) & (User.key != "")):
+    for api_key in TornKey.select(TornKey.user).distinct(TornKey.user):
+        try:
+            api_key = User.select(User.tid).where(User.tid == api_key.user_id).get().key
+        except DoesNotExist:
+            continue
+
         tornget.signature(
             kwargs={
                 "endpoint": "user/?selections=profile,discord,personalstats,battlestats",
-                "key": user.key,
+                "key": api_key,
             },
             queue="api",
         ).apply_async(
@@ -474,16 +476,20 @@ def fetch_attacks_user_runner():
     if redis.ttl("tornium:celery-lock:fetch-attacks-user") < 1:
         redis.expire("tornium:celery-lock:fetch-attacks-user", 1)
 
-    user: User
-    for user in User.select().where((User.key.is_null(False)) & (User.key != "")):
-        if user.key in ("", None):
+    for api_key in TornKey.select(TornKey.user).distinct(TornKey.user):
+        try:
+            user = User.select().where(User.tid == api_key.user_id).get()
+        except DoesNotExist:
+            continue
+
+        if user.key is None:
             continue
         elif user.faction_aa:
             continue
+        elif user.faction is not None and len(user.faction.aa_keys) > 0:
+            continue
         elif user.last_attacks is None:
             User.update(last_attacks=datetime.datetime.utcnow()).where(User.tid == user.tid).execute()
-            continue
-        elif user.faction is not None and len(user.faction.aa_keys) > 0:
             continue
 
         tornget.signature(

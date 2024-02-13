@@ -20,9 +20,9 @@ import typing
 import celery
 from celery.utils.log import get_task_logger
 from redis.commands.json.path import Path
-from tornium_commons import db, rds
+from tornium_commons import rds
 from tornium_commons.formatters import commas, torn_timestamp
-from tornium_commons.models import Notification, Server, StockTick, User
+from tornium_commons.models import Notification, StockTick, TornKey, User
 from tornium_commons.skyutils import SKYNET_ERROR, SKYNET_GOOD, SKYNET_INFO
 
 from .api import discordpost, tornget
@@ -72,7 +72,7 @@ def stocks_prefetch():
     return tornget.signature(
         kwargs={
             "endpoint": "torn/?selections=stocks",
-            "key": User.random_key(),
+            "key": TornKey.random_key(),
         },
         queue="api",
     ).apply_async(
