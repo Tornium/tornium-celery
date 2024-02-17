@@ -21,9 +21,10 @@ from decimal import DivisionByZero
 
 import celery
 from celery.utils.log import get_task_logger
-from peewee import DoesNotExist, fn
+from peewee import DoesNotExist
 from tornium_commons import rds
 from tornium_commons.errors import MissingKeyError, NetworkingError, TornError
+from tornium_commons.formatters import timestamp
 from tornium_commons.models import (
     Faction,
     FactionPosition,
@@ -67,19 +68,20 @@ def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, r
         if (
             user is not None
             and user.last_refresh is not None
-            and time.time() - user.last_refresh.timestamp() <= MIN_USER_UPDATE
+            and time.time() - timestamp(user.last_refresh) <= MIN_USER_UPDATE
         ):
             return
 
         user_id = tid
     elif discordid == tid == 0:
         try:
-            user = TornKey.select(TornKey.user).where(TornKey.key == key).get().user
+            user = TornKey.select(TornKey.user).where(TornKey.api_key == key).get().user
         except DoesNotExist:
-            return
-
-        if user.last_refresh is not None and time.time() - user.last_refresh.timestamp() <= MIN_USER_UPDATE:
-            return
+            pass
+        else:
+            if user.last_refresh is not None and time.time() - timestamp(user.last_refresh) <= MIN_USER_UPDATE:
+                print("too old")
+                return
 
         user_id = 0
         update_self = True
@@ -90,7 +92,7 @@ def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, r
         if (
             user is not None
             and user.last_refresh is not None
-            and time.time() - user.last_refresh.timestamp() <= MIN_USER_UPDATE
+            and time.time() - timestamp(user.last_refresh) <= MIN_USER_UPDATE
         ):
             return
 
@@ -141,12 +143,13 @@ def update_user(self: celery.Task, key: str, tid: int = 0, discordid: int = 0, r
     queue="quick",
     time_limit=10,
 )
-def update_user_self(user_data, key=None):
+def update_user_self(user_data: dict, key: typing.Optional[str] = None):
     user_data_kwargs = {"faction_aa": False}
 
     if key is not None:
-        TornKey.insert(api_key=None, user=None, default=False, disabled=False, paused=False, access_level=False)
-        user_data_kwargs["key"] = key
+        TornKey.insert(
+            api_key=key, user=user_data["player_id"], default=False, disabled=False, paused=False, access_level=None
+        ).on_conflict_ignore().execute()
 
     faction: typing.Optional[Faction]
     if user_data["faction"]["faction_id"] != 0:
@@ -433,7 +436,12 @@ def update_user_other(user_data):
     time_limit=5,
 )
 def refresh_users():
-    for api_key in TornKey.select(TornKey.user).distinct(TornKey.user):
+    for api_key in (
+        TornKey.select(TornKey.user)
+        .join(User)
+        .distinct(TornKey.user)
+        .where((TornKey.disabled == False) & (TornKey.paused == False))
+    ):
         try:
             api_key = User.select(User.tid).where(User.tid == api_key.user_id).get().key
         except DoesNotExist:
@@ -447,7 +455,7 @@ def refresh_users():
             queue="api",
         ).apply_async(
             expires=300,
-            link=update_user_self.s(),
+            link=update_user_self.signature(kwargs={"key": api_key}),
             ignore_result=True,
         )
 
@@ -476,7 +484,7 @@ def fetch_attacks_user_runner():
     if redis.ttl("tornium:celery-lock:fetch-attacks-user") < 1:
         redis.expire("tornium:celery-lock:fetch-attacks-user", 1)
 
-    for api_key in TornKey.select(TornKey.user).distinct(TornKey.user):
+    for api_key in TornKey.select(TornKey.user).distinct(TornKey.user).join(User):
         try:
             user = User.select().where(User.tid == api_key.user_id).get()
         except DoesNotExist:
@@ -495,7 +503,7 @@ def fetch_attacks_user_runner():
         tornget.signature(
             kwargs={
                 "endpoint": "user/?selections=basic,attacks",
-                "fromts": user.last_attacks.timestamp() + 1,  # Timestamp is inclusive,
+                "fromts": timestamp(user.last_attacks) + 1,  # Timestamp is inclusive,
                 "key": user.key,
             },
             queue="api",
@@ -523,7 +531,7 @@ def stat_db_attacks_user(user_data):
     if (
         user.battlescore not in [None, 0]
         and user.battlescore_update is not None
-        and user.battlescore_update.timestamp() - int(time.time()) <= 259200
+        and timestamp(user.battlescore_update) - time.time() <= 259200
     ):  # Three days
         user_score = user.battlescore
     else:
@@ -565,7 +573,7 @@ def stat_db_attacks_user(user_data):
             3,
         ):  # 3x FF can be greater than the defender battlescore indicated
             continue
-        elif user.last_attacks is not None and attack["timestamp_ended"] <= user.last_attacks.timestamp():
+        elif user.last_attacks is not None and attack["timestamp_ended"] <= timestamp(user.last_attacks):
             continue
         elif attack["respect"] == 0:
             continue

@@ -38,7 +38,7 @@ logger = get_task_logger("celery_app")
     time_limit=15,
 )
 def update_items(items_data):
-    Item.update_items(torn_get=tornget, key=User.random_key())
+    Item.update_items(torn_get=tornget, key=User.random_key().api_key)
 
     rds().set(
         "tornium:items:last-update",

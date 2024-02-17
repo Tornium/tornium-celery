@@ -52,7 +52,7 @@ def send_dm(discord_id: int, payload: dict):
 )
 def remove_key_error(key: str, error: int):
     try:
-        key: TornKey = TornKey.select(TornKey.user).where(TornKey.key == key).get()
+        key: TornKey = TornKey.select(TornKey.user).where(TornKey.api_key == key).get()
     except DoesNotExist:
         return
 
