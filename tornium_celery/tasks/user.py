@@ -17,6 +17,7 @@ import datetime
 import math
 import time
 import typing
+import uuid
 from decimal import DivisionByZero
 
 import celery
@@ -148,7 +149,13 @@ def update_user_self(user_data: dict, key: typing.Optional[str] = None):
 
     if key is not None:
         TornKey.insert(
-            api_key=key, user=user_data["player_id"], default=False, disabled=False, paused=False, access_level=None
+            guid=uuid.uuid4(),
+            api_key=key,
+            user=user_data["player_id"],
+            default=False,
+            disabled=False,
+            paused=False,
+            access_level=None,
         ).on_conflict_ignore().execute()
 
     faction: typing.Optional[Faction]
