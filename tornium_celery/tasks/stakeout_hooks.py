@@ -486,7 +486,7 @@ def run_faction_stakeouts():
                 continue
 
             key_user: typing.Optional[User] = (
-                User.select(User.key).where(User.tid == random.choice(guild.admins)).first()
+                User.select(User.tid).where(User.tid == random.choice(guild.admins)).first()
             )
 
             if key_user is None:
@@ -679,8 +679,9 @@ def faction_hook(faction_data):
                     else:
                         valid_notifications.append(notification)
 
-            for notification in valid_notifications:
-                send_notification(notification, payload)
+            if valid_notifications is not None:
+                for notification in valid_notifications:
+                    send_notification(notification, payload)
 
         payload["embeds"][0]["title"] = "Peace Treaty Ended"
         payload["embeds"][0]["color"] = SKYNET_ERROR
@@ -715,8 +716,9 @@ def faction_hook(faction_data):
                     else:
                         valid_notifications.append(notification)
 
-            for notification in valid_notifications:
-                send_notification(notification, payload)
+            if valid_notifications is not None:
+                for notification in valid_notifications:
+                    send_notification(notification, payload)
 
         if len(faction_add) > 0:
             redis_client.sadd(f"{redis_key}:peace", *faction_add)
