@@ -14,9 +14,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import celery
-from peewee import DoesNotExist, fn
+from peewee import DoesNotExist
 from tornium_commons import rds
-from tornium_commons.models import Faction, TornKey, User
+from tornium_commons.models import TornKey, User
 
 
 @celery.shared_task(
@@ -61,9 +61,6 @@ def remove_key_error(key: str, error: int):
 
     if error == 7:
         User.update(faction_aa=False, faction_position=None).where(User.tid == user_id).execute()
-        Faction.update(aa_keys=fn.array_remove(Faction.aa_keys, key)).execute()
-    elif error in (2, 10, 13):
-        Faction.update(aa_keys=fn.array_remove(Faction.aa_keys, key)).execute()
 
 
 # TODO: Rewrite this section to be more efficient

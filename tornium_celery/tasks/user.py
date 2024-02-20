@@ -686,7 +686,7 @@ def check_api_keys():
                     kwargs={"endpoint": "user/?selections=basic", "key": key.api_key, "pass_error": True}, queue="api"
                 ),
             ]
-        )(check_api_key_sub.signature(kwargs={"guid": key.guid}))()
+        )(check_api_key_sub.signature(kwargs={"guid": key.guid}))
 
     for key_user in (
         TornKey.select(TornKey.user)
