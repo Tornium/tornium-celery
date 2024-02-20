@@ -443,12 +443,7 @@ def update_user_other(user_data):
     time_limit=5,
 )
 def refresh_users():
-    for api_key in (
-        TornKey.select(TornKey.user)
-        .join(User)
-        .distinct(TornKey.user)
-        .where((TornKey.disabled == False) & (TornKey.paused == False))
-    ):
+    for api_key in TornKey.select(TornKey.user).join(User).distinct(TornKey.user).where(TornKey.default == True):
         try:
             api_key = User.select(User.tid).where(User.tid == api_key.user_id).get().key
         except DoesNotExist:
@@ -491,7 +486,12 @@ def fetch_attacks_user_runner():
     if redis.ttl("tornium:celery-lock:fetch-attacks-user") < 1:
         redis.expire("tornium:celery-lock:fetch-attacks-user", 1)
 
-    for api_key in TornKey.select(TornKey.user).distinct(TornKey.user).join(User):
+    for api_key in (
+        TornKey.select(TornKey.user)
+        .distinct(TornKey.user)
+        .join(User)
+        .where((TornKey.access_level.is_null(False)) & (TornKey.access_level >= 3))
+    ):
         try:
             user = User.select().where(User.tid == api_key.user_id).get()
         except DoesNotExist:

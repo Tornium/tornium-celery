@@ -543,7 +543,9 @@ def fetch_attacks_runner():
     if redis.ttl("tornium:celery-lock:fetch-attacks") < 1:
         redis.expire("tornium:celery-lock:fetch-attacks", 1)
 
-    for api_key in TornKey.select().distinct(TornKey.user.faction.tid).join(User).join(Faction):
+    for api_key in (
+        TornKey.select().distinct(TornKey.user.faction.tid).join(User).join(Faction).where(TornKey.default == True)
+    ):
         faction: typing.Optional[Faction] = Faction.select().where(Faction.tid == api_key.user.faction.tid).first()
 
         if faction is None:
@@ -1150,7 +1152,13 @@ def stat_db_attacks(faction_data, last_attacks=None):
     time_limit=5,
 )
 def oc_refresh():
-    for api_key in TornKey.select().distinct(TornKey.user.faction.tid).join(User).join(Faction):
+    for api_key in (
+        TornKey.select()
+        .distinct(TornKey.user.faction.tid)
+        .join(User)
+        .join(Faction)
+        .where((TornKey.default == True) & (TornKey.user.faction_aa == True))
+    ):
         faction: typing.Optional[Faction] = Faction.select().where(Faction.tid == api_key.user.faction_id).first()
 
         if faction is None:
@@ -1630,7 +1638,7 @@ def armory_check():
         .distinct(TornKey.user.faction.tid)
         .join(User)
         .join(Faction)
-        .where((TornKey.disabled == False) & (TornKey.paused == False))
+        .where((TornKey.default == True) & (TornKey.user.faction_aa == True))
     ):
         faction: typing.Optional[Faction] = Faction.select().where(Faction.tid == api_key.user.faction_id).first()
 
