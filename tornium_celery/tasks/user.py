@@ -486,12 +486,7 @@ def fetch_attacks_user_runner():
     if redis.ttl("tornium:celery-lock:fetch-attacks-user") < 1:
         redis.expire("tornium:celery-lock:fetch-attacks-user", 1)
 
-    for api_key in (
-        TornKey.select(TornKey.user)
-        .distinct(TornKey.user)
-        .join(User)
-        .where((TornKey.access_level.is_null(False)) & (TornKey.access_level >= 3))
-    ):
+    for api_key in TornKey.select(TornKey.user).distinct(TornKey.user).join(User).where(TornKey.default == True):
         try:
             user = User.select().where(User.tid == api_key.user_id).get()
         except DoesNotExist:
