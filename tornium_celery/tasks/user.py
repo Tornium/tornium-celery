@@ -667,3 +667,79 @@ def stat_db_attacks_user(user_data):
         except Exception as e:
             logger.exception(e)
             continue
+
+
+@celery.shared_task(
+    name="tasks.user.check_api_keys",
+    routing_key="quick.check_api_keys",
+    queue="quick",
+    time_limit=5,
+)
+def check_api_keys():
+    for key in TornKey.select().where((TornKey.user.is_null(True)) | (TornKey.access_level.is_null(True))):
+        celery.chord(
+            [
+                tornget.signature(
+                    kwargs={"endpoint": "key/?selections=info", "key": key.api_key, "pass_error": True}, queue="api"
+                ),
+                tornget.signature(
+                    kwargs={"endpoint": "user/?selections=basic", "key": key.api_key, "pass_error": True}, queue="api"
+                ),
+            ]
+        )(check_api_key_sub.signature(kwargs={"guid": key.guid}))()
+
+    for key_user in (
+        TornKey.select(TornKey.user)
+        .join(User)
+        .distinct(TornKey.user)
+        .where((TornKey.disabled == False) & (TornKey.paused == False))
+    ):
+        base_query = TornKey.select().where(TornKey.user == key_user.user_id)
+
+        default_key = base_query.where(TornKey.default == True).first()
+
+        if default_key is not None and (default_key.paused or default_key.disabled):
+            TornKey.update(default=False).where(TornKey.guid == default_key.guid).execute()
+        elif default_key is not None and not default_key.paused and not default_key.disabled:
+            continue
+
+        new_default_key = base_query.where(
+            (TornKey.access_level >= 3) & (TornKey.disabled == False) & (TornKey.paused == False)
+        ).first()
+
+        if new_default_key is not None:
+            TornKey.update(default=True).where(TornKey.guid == new_default_key.guid).execute()
+
+
+@celery.shared_task(
+    name="tasks.user.check_api_key_sub",
+    routing_key="quick.check_api_key_sub",
+    queue="quick",
+    time_limit=5,
+)
+def check_api_key_sub(args, guid: str):
+    key_data, user_data = args
+    if "error" in key_data:
+        if key_data["error"]["code"] in (
+            1,  # Key is empty
+            2,  # Incorrect key
+            16,  # Access level of this key is not high enough
+        ):
+            TornKey.delete().where(TornKey.guid == guid).execute()
+            return
+        elif key_data["error"]["code"] in (
+            10,  # Key owner is in federal jail
+            18,  # API key has been paused by the owner
+        ):
+            TornKey.update(paused=True).where(TornKey.guid == guid).execute()
+            return
+
+    key_db: TornKey = TornKey.select().where(TornKey.guid == guid).get()
+
+    if key_data["access_level"] == 0:
+        key_db.delete_instance()
+        return
+
+    TornKey.update(user=user_data["player_id"], access_level=key_data["access_level"]).where(
+        TornKey.guid == guid
+    ).execute()
